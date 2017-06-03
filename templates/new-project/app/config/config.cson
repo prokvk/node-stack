@@ -1,0 +1,32 @@
+knapp:
+	port: 8911
+	static_tokens: [
+		process.env.AUTH_TOKEN
+	]
+
+mailer:
+	service: 'SES-EU-WEST-1'
+	from: 'NAME <NAME@DOMAIN.com>'
+	auth:
+		user: process.env.MAILER_USER
+		pass: process.env.MAILER_PASS
+
+mysql:
+	connection: "mysql://#{process.env.MYSQL_USER}:#{process.env.MYSQL_PASS}@#{process.env.MYSQL_HOST}/#{process.env.MYSQL_DB}"
+
+rabbitmq:
+	connection: "amqp://#{process.env.RABBITMQ_LOGIN}:#{process.env.RABBITMQ_PASSWORD}@#{process.env.RABBITMQ_HOST}:#{process.env.RABBITMQ_PORT}"
+	bindings:
+		test:
+			queue: 'test'
+			exchange: 'test_exc'
+		test22:
+			queue: 'test22'
+			exchange: 'test22_exc'
+
+mongo:
+	connection: "mongodb://#{process.env.MONGO}:#{process.env.MONGO_PORT}/#{process.env.MONGO_DB}?fsync=false"
+
+redis:
+	connection: "redis://#{process.env.REDIS}:#{process.env.REDIS_PORT}"
+	prefix: "test_"

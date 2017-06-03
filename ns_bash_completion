@@ -1,0 +1,41 @@
+#!/bin/bash
+
+. $NODESTACK_PATH/.env
+. $NODESTACK_PATH/config_functions.sh
+
+ns_parser_options() {
+	local CURR PREV
+
+	CURR=${COMP_WORDS[COMP_CWORD]}
+	PREV=${COMP_WORDS[COMP_CWORD-1]}
+
+	case ${COMP_CWORD} in
+		1)
+			COMPREPLY=($(compgen -W "$1" -- $CURR))
+			;;
+		2)
+			if [[ $2 != "" ]]; then
+				ITEMS=$(explode "|" $2)
+
+				for ITEM in ${ITEMS[@]}; do
+					L1=$(echo $ITEM | sed -e 's/:.*$//')
+					L2=$(echo $ITEM | sed -e 's/^[^:]*://')
+					VALS=$(explode "," "${L2}")
+
+					if [[ $PREV == $L1 ]]; then
+						COMPREPLY=($(compgen -W "${VALS[@]}" -- $CURR))
+					fi
+				done
+			fi
+			;;
+		*)
+			COMPREPLY=()
+			;;
+	esac
+}
+
+ns_parser_options_default() {
+	ns_parser_options "temp runs stops create-project init-project gendoc atest npmi gcompile install-test deploy printsshkey pull" "temp:cpfuncfiles"
+}
+
+complete -F ns_parser_options_default nodestack

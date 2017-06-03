@@ -1,0 +1,25 @@
+#!/bin/bash
+
+ROOTDIR=$(pwd)
+CFG=$ROOTDIR/.config
+DOCKER_DIR=$ROOTDIR/docker
+
+. $ROOTDIR/config_functions.sh
+
+#pull and install docker images
+DOCKER_IMAGES=(docker_nginx docker_swagger_codegen docker_node_server)
+
+for ITEM in ${DOCKER_IMAGES[@]}; do
+	cd $DOCKER_DIR
+	git clone $(parseBlockValue $CFG repo $ITEM)
+
+	IMAGENAME=$(parseBlockValue $CFG image_name $ITEM)
+	if [[ $(docker images | awk '{print $1}' | grep $IMAGENAME | wc -l) == 0 ]]; then
+		cd $(parseBlockValue $CFG folder $ITEM)
+		make build
+	fi
+done
+
+#set $NODESTACK_PATH variable
+REPLACEPATH=$(echo $ROOTDIR | sed -e 's/\//\\\//g')
+CMD="sed -i \"s/____NSPATH____/$REPLACEPATH/\" $ROOTDIR/.env" && eval $CMD

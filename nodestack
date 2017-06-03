@@ -1,0 +1,335 @@
+#!/bin/bash
+
+. $NODESTACK_PATH/.env
+. $NODESTACK_PATH/arg_functions.sh
+. $NODESTACK_PATH/config_functions.sh
+
+PARAMS=$(getParams "$@")
+
+function runNginx() {
+	if [[ $(docker ps -a --format "{{.Names}}" | grep $NODESTACK_NGINX_CONTAINER | wc -l) != 0 ]]; then
+		stopDockerContainer $NODESTACK_NGINX_CONTAINER
+	fi
+
+	SERVERIP=$(getNewContainerIp 1)
+	PROJECTNAME=$(getProjectName | sed -e 's/"//g')
+	PWD=$(pwd)
+	DIR=$(basename $PWD)
+
+	UPSTREAMCONF="upstream ${PROJECTNAME}_api {
+	server api.ccl:${NODESTACK_API_INTERNAL_PORT} max_fails=3 fail_timeout=10s;
+}"
+
+	PROXYCONF="location /ns/${PROJECTNAME}/doc {
+	rewrite ^/ns/${PROJECTNAME}/doc(.*) /${DIR}/doc$1;
+}
+
+location /ns/${PROJECTNAME}/api {
+	proxy_pass http://${PROJECTNAME}_api/api;
+}"
+
+	cat > "$NODESTACK_NGINX_PATH/config/proxy/$PROJECTNAME.conf" <<EOF
+$PROXYCONF
+EOF
+
+	cat > "$NODESTACK_NGINX_PATH/config/upstream/$PROJECTNAME.conf" <<EOF
+$UPSTREAMCONF
+EOF
+
+	CMD="docker run -d --name $NODESTACK_NGINX_CONTAINER -p $NODESTACK_NGINX_PORT:$NODESTACK_NGINX_PORT \
+		--add-host=\"api.ccl:$SERVERIP\" \
+		-v $NODESTACK_NGINX_PATH/config:/etc/nginx \
+		-v $NODESTACK_NGINX_PATH/keys:/keys \
+		-v $NODESTACK_PROJECTS_PATH:/projects \
+		$NODESTACK_NGINX_CONTAINER"
+
+	# echo $CMD
+	eval $CMD
+
+	NGINX_IP=$(getContainerIp $NODESTACK_NGINX_CONTAINER)
+
+	echo -e "\nNS running, links:\nDOC: http://localhost:${NODESTACK_NGINX_PORT}/ns/${PROJECTNAME}/doc\nAPI: http://localhost:${NODESTACK_NGINX_PORT}/ns/${PROJECTNAME}\n"
+}
+
+function getContainerIp() {
+	CONTAINER_NAME=$1
+	CONTAINER_ID=$(docker ps -a | grep $CONTAINER_NAME | awk '{print $1}')
+	echo $(docker network inspect bridge | awk "/${CONTAINER_ID}/{f=1} f==1&&/IPv4Address/{print;exit}" | sed -e 's/^.*"IPv4Address": "//' -e 's/\/.*$//')
+}
+
+function stopDockerContainer() {
+	docker stop $1
+	docker rm $1
+}
+
+function getProjectName() {
+	PWD=$(pwd)
+	CFG="${PWD}/.nodestack"
+
+	if [ ! -e $CFG ]; then
+		echo "ERROR: config file NOT FOUND!" && exit 1 
+	fi
+
+	PROJECTNAME=$(parseBlockValue $CFG name project)
+	echo $PROJECTNAME | tr '[:upper:]' '[:lower:]' | sed -e 's/ /-/g'
+}
+
+function getNewContainerIp() {
+	if [[ $1 == '' ]]; then SKIP=0; else SKIP=$1; fi
+
+	((REQUIRED=$SKIP+1))
+	X=2
+	FOUND=0
+	IP=""
+
+	while [[ $FOUND -lt $REQUIRED ]]; do
+		if [[ $(docker network inspect bridge | grep IPv4Address | grep "172.17.0.${X}" | wc -l) == 0 ]]; then
+			((FOUND=$FOUND+1))
+			IP="172.17.0.${X}"
+		fi
+		((X=$X+1))
+	done
+	echo $IP
+}
+
+function getNewContainerName() {
+	X=1
+	while [[ $(docker ps -a | grep "${NODESTACK_NODE_SERVER_CONTAINER}_${X}" | wc -l) != 0 ]]; do
+		((X=$X+1))
+	done
+	echo "${NODESTACK_NODE_SERVER_CONTAINER}_${X}"
+}
+
+function getNewContainerPort() {
+	PORT=8900
+	while [[ $(docker ps -a | grep -- ":${PORT}->" | wc -l) != 0 ]]; do
+		((PORT=$PORT+1))
+	done
+	echo $PORT
+}
+
+function runServer() {
+	PWD=$(pwd)
+	CFG="${PWD}/.nodestack"
+
+	if [ ! -e $CFG ]; then
+		echo "ERROR: config file NOT FOUND!" && exit 1 
+	fi
+
+	NAME=$(getNewContainerName)
+	PORT=$(getNewContainerPort)
+	LINKS=(mysql mongo redis rabbitmq)
+	LINKSSTR=""
+
+	for LINK in ${LINKS[@]}; do
+		VAL=$(parseBlockValue $CFG $LINK links)
+
+		if [[ $VAL != '' ]] && [[ $VAL != 0 ]]; then
+			LINKSSTR="$LINKSSTR --link=\"$VAL\""
+		fi
+	done
+
+	DUSER="root"
+	RUNCMD=""
+	CONTAINERPARAMS="--rm"
+	CONTAINERENV=""
+
+	if [[ $1 != '' ]]; then
+		DUSER="1000"
+
+		if [[ $1 == 'npmi' ]]; then
+			LINKSSTR=""
+
+			if [[ $2 != '' ]]; then
+				RUNCMD="npm install --save $2"
+			else
+				RUNCMD="npm install --no-bin-links"
+			fi
+		elif [[ $1 == 'npmi-init-project' ]]; then
+			LINKSSTR=""
+			COMPONENTS=(mailer mongo mysql rabbitmq redis request shell)
+			COMP=""
+
+			for ITEM in ${COMPONENTS[@]}; do
+				if [[ $(parseBlockValue $CFG $ITEM components) == 1 ]]; then
+					COMP="${COMP} knode-$ITEM"
+				fi
+			done 
+
+			RUNCMD="npm install --save ${COMP}"
+		elif [[ $1 == 'bash' ]]; then
+			RUNCMD="bash"
+			CONTAINERPARAMS="$CONTAINERPARAMS -it"
+		elif [[ $1 == 'gcompile' ]]; then
+			LINKSSTR=""
+			RUNCMD="grunt coffee_compile"
+		else
+			if [[ $1 == 'tests' ]] && [[ $NODESTACK_DEPLOY_API_TESTS_PORT != "" ]]; then
+				CONTAINERENV="-e \"TESTS_PORT=${NODESTACK_DEPLOY_API_TESTS_PORT}\""
+			fi
+			RUNCMD="coffee index.coffee mode=$1"
+		fi
+	fi
+
+	CMD="/usr/bin/docker run $CONTAINERPARAMS --name ${NAME} \
+		--user $DUSER \
+		-p ${PORT}:${NODESTACK_API_INTERNAL_PORT} $LINKSSTR $CONTAINERENV \
+		-v $PWD/app/:/usr/src/app \
+		-v $PWD/supervisor_conf/:/etc/supervisor \
+		$NODESTACK_NODE_SERVER_CONTAINER $RUNCMD"
+
+	# echo $CMD
+	eval $CMD
+}
+
+case "$1" in
+	temp)	#TODO - rm after nodestack is ready!!!
+		if [[ ${PARAMS[0]} == 'cpfuncfiles' ]]; then
+			cp ~/bin/arg_functions.sh ./
+			cp ~/bin/config_functions.sh ./
+		fi
+		;;
+	create-project)	#create project - copy new-project template files
+		rsync -avz $NODESTACK_PATH/templates/new-project/ ./
+
+		rm ./app/log/.gitkeep
+		rm ./doc/.gitkeep
+		;;
+	init-project)	#init project - install node modules based on config
+		PWD=$(pwd)
+		CFG="${PWD}/.nodestack"
+
+		if [ ! -e $CFG ]; then
+			echo "ERROR: config file NOT FOUND!" && exit 1 
+		fi
+
+		runServer npmi-init-project
+		runServer npmi
+
+		CONSUMER=$(parseBlockValue $CFG rabbitmq_consumer components)
+		CONSUMER_PATH=$PWD/app/consumer.coffee
+		CONSUMER_CONFIG_PATH=$PWD/supervisor_conf/conf.d/consumer.conf
+
+		if [[ $CONSUMER != 1 ]] && [[ -e $CONSUMER_PATH ]]; then
+			rm $CONSUMER_PATH
+			rm $CONSUMER_CONFIG_PATH
+		fi
+		;;
+	runs)	#run server
+		runNginx
+
+		runServer 
+		;;
+	stops)	#stop server
+		stopDockerContainer $NODESTACK_NGINX_CONTAINER
+		;;
+	gendoc)	#generate swagger doc
+		PWD=$(pwd)
+		CFG="${PWD}/.nodestack"
+
+		if [ ! -e $CFG ]; then
+			echo "ERROR: config file NOT FOUND!" && exit 1 
+		fi
+
+		cp $CFG app
+
+		runServer gendoc
+
+		rm app/.nodestack
+
+		SRCFILE=$PWD/app/$(parseBlockValue $CFG source_file swagger)
+		DOCFOLDER=$PWD/$(parseBlockValue $CFG doc_folder swagger)
+
+		$NODESTACK_SWAGGER_CODEGEN_PATH/swagger-codegen $SRCFILE $DOCFOLDER
+		;;
+	atest)	#run automated tests
+		PWD=$(pwd)
+		CFG="${PWD}/.nodestack"
+
+		if [ ! -e $CFG ]; then
+			echo "ERROR: config file NOT FOUND!" && exit 1 
+		fi
+
+		cp $CFG app
+
+		runServer tests
+
+		rm app/.nodestack
+		;;
+	install-test)	#test that nodestack has been installed correctly
+		IMAGES=(ns_nginx swagger_codegen ns_node_server)
+		DIMAGES=$(docker images | awk '{print $1}')
+		for ITEM in ${IMAGES[@]}; do
+			if [[ $(inArray ${DIMAGES[@]} $ITEM) == 0 ]]; then
+				echo "ERROR: image $ITEM NOT FOUND!" && exit 1 
+			fi
+		done
+
+		echo "Install test successful"
+		;;
+	npmi)	#npm install current project
+		if [[ ${PARAMS[0]} != '' ]]; then
+			runServer npmi ${PARAMS[0]}
+		else
+			runServer npmi
+		fi
+		;;
+	gcompile)	#grunt compile coffee current project
+		runServer gcompile
+		;;
+	printsshkey)	#print ns-node-server public SSH key
+		docker run --rm -it --name ns_psk $NODESTACK_NODE_SERVER_CONTAINER cat /root/.ssh/id_rsa.pub
+		;;
+	deploy)	#deploy project
+		PWD=$(pwd)
+		CFG="${PWD}/.nodestack"
+
+		if [ ! -e $CFG ]; then
+			echo "ERROR: config file NOT FOUND!" && exit 1
+		fi
+
+		if [[ ${PARAMS[0]} == '' ]]; then
+			echo "ERROR: remote name is required as an argument to this command" && exit 1 
+		fi
+
+		REMOTE=${PARAMS[0]}
+		if [[ $(cat $CFG | grep "\[remote-${REMOTE}\]" | wc -l) == 0 ]]; then
+			echo "ERROR: invalid remote name" && exit 1 
+		fi
+
+		REMOTE_USER=$(parseBlockValue $CFG user remote-$REMOTE)
+		REMOTE_HOST=$(parseBlockValue $CFG host remote-$REMOTE)
+		REPO=$(parseBlockValue $CFG repository remote-$REMOTE)
+		BRANCH=$(parseBlockValue $CFG branch remote-$REMOTE)
+		DATA="'{\\\"name\\\": \\\"$NODESTACK_DEVELOPER_NAME\\\",\
+			\\\"email\\\": \\\"$NODESTACK_DEVELOPER_EMAIL\\\",\
+			\\\"repo\\\": \\\"$REPO\\\",\
+			\\\"branch\\\": \\\"$BRANCH\\\"}'"
+
+		CMD="ssh ${REMOTE_USER}@${REMOTE_HOST} \
+			\"curl -s -XPOST -H 'Content-Type: application/json' \
+			-d $DATA \
+			\\\$NODESTACK_DEPLOY_URL\""
+
+		# echo $CMD
+		eval $CMD
+		;;
+	pull)	#pull & setup a nodestack project
+		if [[ $# != 2 ]]; then
+			echo "ERROR: incorrect args, correct format is \"nodestack pull REPOSITORY_URL\"" && exit 1 
+		fi
+
+		REPO=$2
+		PWD=$(pwd)
+		PDIR=$(echo $REPO | sed -e 's/^.\+\///' -e 's/\.git$//')
+
+		git clone $REPO
+		cd $PDIR
+		nodestack npmi
+		mkdir -p app/log doc
+		cp $NODESTACK_PATH/templates/new-project/app/Gruntfile.coffee app
+		;;
+	*)	#default
+		echo "ERROR: command NOT FOUND!" && exit 1 
+		;;
+esac
