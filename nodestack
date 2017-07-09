@@ -232,15 +232,16 @@ case "$1" in
 		fi
 
 		cp $CFG app
+		cp $NODESTACK_PATH/templates/doc/doc.css app
 
-		runServer gendoc
+		runServer genswaggerfile
 
 		rm app/.nodestack
 
-		SRCFILE=$PWD/app/$(parseBlockValue $CFG source_file swagger)
-		DOCFOLDER=$PWD/$(parseBlockValue $CFG doc_folder swagger)
+		runServer gendoc
 
-		$NODESTACK_SWAGGER_CODEGEN_PATH/swagger-codegen $SRCFILE $DOCFOLDER
+		rm app/doc.css
+		mv $PWD/app/doc.html $PWD/doc/index.html
 		;;
 	atest)	#run automated tests
 		PWD=$(pwd)
@@ -257,7 +258,7 @@ case "$1" in
 		rm app/.nodestack
 		;;
 	install-test)	#test that nodestack has been installed correctly
-		IMAGES=(ns_nginx swagger_codegen ns_node_server)
+		IMAGES=(ns_nginx ns_node_server)
 		DIMAGES=$(docker images | awk '{print $1}')
 		for ITEM in ${IMAGES[@]}; do
 			if [[ $(inArray ${DIMAGES[@]} $ITEM) == 0 ]]; then

@@ -18,10 +18,9 @@ Create a directory for node-stack and `cd` into it. Then run
 
 This command will install node-stack in current directory.
 
-Install script will pull 3 repositories with docker images and build them. These repositories are:
+Install script will pull 2 repositories with docker images and build them. These repositories are:
 
 * [ns-docker-nginx](https://github.com/prokvk/ns-docker-nginx)
-* [docker-swagger-codegen](https://github.com/prokvk/docker-swagger-codegen)
 * [ns-node-server](https://github.com/prokvk/ns-node-server)
 
 After you've ran installation script you need to do the following:
@@ -48,9 +47,8 @@ All you should see is `Install test successful`
 # How does it work
 
 * NGINX container is used as a proxy for both API and DOC.
-* swagger-codegen is used for generating static documentation
 * Node server container is used for running server with API, installing modules, compiling coffee, running tests...
-* [knapp](https://www.npmjs.com/package/knapp) module has prepared tools for performing automated tests and generating swaggerfile, which is then used by the swagger-codegen container to generate static documentation.
+* [knapp](https://www.npmjs.com/package/knapp) module has prepared tools for performing automated tests and generating static documentation.
 
 Every time you run the server (with `nodestack runs`) NGINX config files are generated and NGINX is started/restarted before node server container starts.
 

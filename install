@@ -7,7 +7,7 @@ DOCKER_DIR=$ROOTDIR/docker
 . $ROOTDIR/config_functions.sh
 
 #pull and install docker images
-DOCKER_IMAGES=(docker_nginx docker_swagger_codegen docker_node_server)
+DOCKER_IMAGES=(docker_nginx docker_node_server)
 
 for ITEM in ${DOCKER_IMAGES[@]}; do
 	cd $DOCKER_DIR
