@@ -147,7 +147,7 @@ If you just want to run `npm install` then use `nodestack npmi`
 
 If you want to install specific module (`npm install --save MODULE_NAME`) then use `nodestack npmi MODULE_NAME`
 
-# Use JavaScript 
+# Use JavaScript
 
 To compile coffee files in `app` folder use `nodestack gcompile`
 
@@ -165,3 +165,7 @@ Run `nodestack pull REPOSITORY_URL`. This will:
 * `npm install` dependencies
 * create necessary folders
 * copy template Gruntfile
+
+# Update node-stack
+
+To update NS files from repository run `$NODESTACK_PATH/update`. This will NOT update your `.env` file, so if there are changes you need to apply them manually.  

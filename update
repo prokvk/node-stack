@@ -1,0 +1,14 @@
+#!/bin/bash
+
+ROOTDIR=$(pwd)
+TEMPDIR=$ROOTDIR/_update_temp
+
+mkdir -p $TEMPDIR && cd $TEMPDIR
+
+git clone $NODESTACK_REPO_URL .
+
+cd $ROOTDIR
+
+rsync -avz $TEMPDIR/ ./ --exclude .env --exclude .git
+
+rm -rf $TEMPDIR
