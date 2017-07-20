@@ -91,6 +91,9 @@ repository=REPO_URL
 # specify which branch should be deployed
 branch=BRANCH_NAME
 
+# project name on node-stack-server on this particular remote
+project_name=PROJECT_NAME
+
 # run automated tests on deploy - format is tests=0|1, or you can comment a line out, which has the same effect as setting it to 0
 tests=1
 

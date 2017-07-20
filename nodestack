@@ -67,7 +67,7 @@ function getProjectName() {
 	CFG="${PWD}/.nodestack"
 
 	if [ ! -e $CFG ]; then
-		echo "ERROR: config file NOT FOUND!" && exit 1 
+		echo "ERROR: config file NOT FOUND!" && exit 1
 	fi
 
 	PROJECTNAME=$(parseBlockValue $CFG name project)
@@ -113,7 +113,7 @@ function runServer() {
 	CFG="${PWD}/.nodestack"
 
 	if [ ! -e $CFG ]; then
-		echo "ERROR: config file NOT FOUND!" && exit 1 
+		echo "ERROR: config file NOT FOUND!" && exit 1
 	fi
 
 	NAME=$(getNewContainerName)
@@ -154,7 +154,7 @@ function runServer() {
 				if [[ $(parseBlockValue $CFG $ITEM components) == 1 ]]; then
 					COMP="${COMP} knode-$ITEM"
 				fi
-			done 
+			done
 
 			RUNCMD="npm install --save ${COMP}"
 		elif [[ $1 == 'bash' ]]; then
@@ -200,7 +200,7 @@ case "$1" in
 		CFG="${PWD}/.nodestack"
 
 		if [ ! -e $CFG ]; then
-			echo "ERROR: config file NOT FOUND!" && exit 1 
+			echo "ERROR: config file NOT FOUND!" && exit 1
 		fi
 
 		runServer npmi-init-project
@@ -218,7 +218,7 @@ case "$1" in
 	runs)	#run server
 		runNginx
 
-		runServer 
+		runServer
 		;;
 	stops)	#stop server
 		stopDockerContainer $NODESTACK_NGINX_CONTAINER
@@ -228,7 +228,7 @@ case "$1" in
 		CFG="${PWD}/.nodestack"
 
 		if [ ! -e $CFG ]; then
-			echo "ERROR: config file NOT FOUND!" && exit 1 
+			echo "ERROR: config file NOT FOUND!" && exit 1
 		fi
 
 		cp $CFG app
@@ -248,7 +248,7 @@ case "$1" in
 		CFG="${PWD}/.nodestack"
 
 		if [ ! -e $CFG ]; then
-			echo "ERROR: config file NOT FOUND!" && exit 1 
+			echo "ERROR: config file NOT FOUND!" && exit 1
 		fi
 
 		cp $CFG app
@@ -262,7 +262,7 @@ case "$1" in
 		DIMAGES=$(docker images | awk '{print $1}')
 		for ITEM in ${IMAGES[@]}; do
 			if [[ $(inArray ${DIMAGES[@]} $ITEM) == 0 ]]; then
-				echo "ERROR: image $ITEM NOT FOUND!" && exit 1 
+				echo "ERROR: image $ITEM NOT FOUND!" && exit 1
 			fi
 		done
 
@@ -290,21 +290,21 @@ case "$1" in
 		fi
 
 		if [[ ${PARAMS[0]} == '' ]]; then
-			echo "ERROR: remote name is required as an argument to this command" && exit 1 
+			echo "ERROR: remote name is required as an argument to this command" && exit 1
 		fi
 
 		REMOTE=${PARAMS[0]}
 		if [[ $(cat $CFG | grep "\[remote-${REMOTE}\]" | wc -l) == 0 ]]; then
-			echo "ERROR: invalid remote name" && exit 1 
+			echo "ERROR: invalid remote name" && exit 1
 		fi
 
 		REMOTE_USER=$(parseBlockValue $CFG user remote-$REMOTE)
 		REMOTE_HOST=$(parseBlockValue $CFG host remote-$REMOTE)
-		REPO=$(parseBlockValue $CFG repository remote-$REMOTE)
+		PROJECTNAME=$(parseBlockValue $CFG project_name remote-$REMOTE)
 		BRANCH=$(parseBlockValue $CFG branch remote-$REMOTE)
 		DATA="'{\\\"name\\\": \\\"$NODESTACK_DEVELOPER_NAME\\\",\
 			\\\"email\\\": \\\"$NODESTACK_DEVELOPER_EMAIL\\\",\
-			\\\"repo\\\": \\\"$REPO\\\",\
+			\\\"project_name\\\": \\\"$PROJECTNAME\\\",\
 			\\\"branch\\\": \\\"$BRANCH\\\"}'"
 
 		CMD="ssh ${REMOTE_USER}@${REMOTE_HOST} \
@@ -317,7 +317,7 @@ case "$1" in
 		;;
 	pull)	#pull & setup a nodestack project
 		if [[ $# != 2 ]]; then
-			echo "ERROR: incorrect args, correct format is \"nodestack pull REPOSITORY_URL\"" && exit 1 
+			echo "ERROR: incorrect args, correct format is \"nodestack pull REPOSITORY_URL\"" && exit 1
 		fi
 
 		REPO=$2
@@ -331,6 +331,6 @@ case "$1" in
 		cp $NODESTACK_PATH/templates/new-project/app/Gruntfile.coffee app
 		;;
 	*)	#default
-		echo "ERROR: command NOT FOUND!" && exit 1 
+		echo "ERROR: command NOT FOUND!" && exit 1
 		;;
 esac
