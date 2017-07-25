@@ -99,3 +99,6 @@ tests=1
 
 # generate documentation on deploy - format is doc=0|1, or you can comment a line out, which has the same effect as setting it to 0
 doc=1
+
+# setup nginx proxy for documentation and API - format is nginx_proxy=0|1, or you can comment a line out, which has the same effect as setting it to 1
+nginx_proxy=1
