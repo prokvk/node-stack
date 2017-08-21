@@ -14,7 +14,7 @@ for ITEM in ${DOCKER_IMAGES[@]}; do
 	git clone $(parseBlockValue $CFG repo $ITEM)
 
 	IMAGENAME=$(parseBlockValue $CFG image_name $ITEM)
-	if [[ $(docker images | awk '{print $1}' | grep $IMAGENAME | wc -l) == 0 ]]; then
+	if [[ $(docker images | awk '{print $1}' | grep $IMAGENAME | wc -l) -eq 0 ]]; then
 		cd $(parseBlockValue $CFG folder $ITEM)
 		make build
 	fi
@@ -22,4 +22,5 @@ done
 
 #set $NODESTACK_PATH variable
 REPLACEPATH=$(echo $ROOTDIR | sed -e 's/\//\\\//g')
-CMD="sed -i \"s/____NSPATH____/$REPLACEPATH/\" $ROOTDIR/.env" && eval $CMD
+CMD="sed -i.bak \"s/____NSPATH____/$REPLACEPATH/\" $ROOTDIR/.env" && eval $CMD
+rm $ROOTDIR/.env.bak

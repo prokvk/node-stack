@@ -39,13 +39,15 @@ function parseBlockValue() {
 		cp $SRCFILE $TMPFILE
 		COUNT=$(cat $TMPFILE | wc -l)
 
-		sed -i "${NEXT},${COUNT}d" $TMPFILE
+		sed -i.bak "${NEXT},${COUNT}d" $TMPFILE
+		rm $TMPFILE.bak
 	else
 		TMPFILE=$SRCFILE
 	fi
 
 	CMD="/usr/bin/awk '/^\[${BLOCKNAME}\]/{f=1} f==1&&/^${VARNAME}=/{print;exit}' ${TMPFILE}"
-	echo $(eval $CMD | /bin/sed -e 's/^[^=]\+=//')
+	SEDBIN=$(which sed)
+	echo $(eval $CMD | eval "$SEDBIN -e 's/^$VARNAME=//'")
 
 	if [[ $NEXT != '' ]]; then
 		rm $TMPFILE
