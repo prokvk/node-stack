@@ -14,7 +14,7 @@ This documentation will refer to `coffee` files only. There is a tool prepared f
 
 Create a directory for node-stack and `cd` into it. Then run
 
-`git clone https://rossap_usertech@bitbucket.org/rossap_usertech/node-stack.git . && ./install`
+`git clone https://bitbucket.org/usertech/node-stack.git . && ./install`
 
 This command will install node-stack in current directory.
 
