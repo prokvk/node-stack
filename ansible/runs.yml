@@ -1,0 +1,10 @@
+# run server
+- block:
+    # docker cmds
+    - include_role:
+          name: docker
+      vars:
+          _tag: runs
+          _set_links: True
+          _user: root
+  tags: ['action']

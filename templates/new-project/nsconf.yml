@@ -1,0 +1,52 @@
+project:
+    name: "Project name"
+
+# "components" section specifies which components will be installed (NPM) and setup when using `nodestack init-project` command
+# format is always name=0|1, or you can comment a line out, which has the same effect as setting it to 0
+components:
+    rabbitmq_consumer: 1 # this will include a sample consumer.coffee file in the project
+    mailer: 1 # this will include `knode-mailer` npm module
+    mongo: 1 # this will include `knode-mongo` npm module
+    mysql: 1 # this will include `knode-mysql` npm module
+    rabbitmq: 1 # this will include `knode-rabbitmq` npm module
+    redis: 1 # this will include `knode-redis` npm module
+    request: 1 # this will include `knode-request` npm module
+    shell: 1 # this will include `knode-shell` npm module
+
+# path to local config file (non versioned)
+local_conf: local.nsconf.yml
+
+# "swagger" section defines values for generating documentation
+swagger:
+    source_file: swagger.json # versioned swagger file name
+    doc_folder: doc # folder where documentation will be generated (you don't need to edit this)
+    swagger_version: "2.0" # swaggerfile version (you don't need to edit this)
+    info_version: "1.0.0" # swaggerfile project version
+    info_title: "Project name" # swaggerfile project name
+    info_description: "Project desription" # swaggerfile project description
+    host: "http://localhost:8911" # local API URL used with automated tests and for swagger (you don't need to edit this)
+    consumes: "application/json" # you don't need to edit this
+    produces: "application/json" # you don't need to edit this
+
+# deploy variables for remote "dev"
+remotes:
+    dev:
+        user: REMOTE_USER_NAME # maintainer of node-stack-server should provide you with this
+        host: REMOTE_URL # maintainer of node-stack-server should provide you with this
+        repository: REPO_URL # GIT repository URL in format "git@bitbucket.org:USERNAME/PROJECT.git" (currently only bitbucket is supported)
+        branch: BRANCH_NAME # specify which branch should be deployed
+        project_name: PROJECT_NAME # project name on node-stack-server on this particular remote
+        tests: 1 # run automated tests on deploy - format is tests=0|1, or you can comment a line out, which has the same effect as setting it to 0
+        doc: 1 # generate documentation on deploy - format is doc=0|1, or you can comment a line out, which has the same effect as setting it to 0
+        nginx_proxy: 1 # setup nginx proxy for documentation and API - format is nginx_proxy=0|1, or you can comment a line out, which has the same effect as setting it to 1
+        docker:
+            server_image: ns_node_server # maintainer of node-stack-server should provide you with this
+            links: # maintainer of node-stack-server should provide you with this
+                # - mysql:mysql.ccl # this will make MySQL available on URL mysql.ccl inside node server container
+                # - rabbitmq1:rabbitmq.ccl # this will make RabbitMQ available on URL rabbitmq.ccl inside node server container
+                # - redis:redis.ccl # this will make REDIS available on URL redis.ccl inside node server container
+                # - mongo:mongo.ccl # this will make MongoDB available on URL mongo.ccl inside node server container
+            hosts:
+                # - mysql.ccl:10.10.8.1 # this will add mysql.ccl into container hosts file making mysql.ccl point to specified IP
+            volumes:
+                # - /local/host/path:/container/path # this will share a volume with server container

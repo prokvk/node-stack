@@ -1,0 +1,37 @@
+---
+- hosts: localhost
+  tasks:
+      # checks
+      - block:
+          # check missing `_cmd` var
+          - fail:
+                msg: "ERROR: required `_cmd` variable is missing"
+            when: _cmd is undefined
+
+          # check missing `_project_dir` var for relevant cmds
+          - fail:
+                msg: "ERROR: required `_project_dir` variable is missing"
+            when:
+                - _cmd in ns_commands_requiring_project_cfg
+                - _project_dir is not defined
+
+          # check missing project cfg for relevant cmds
+          - block:
+                - stat:
+                      path: "{{ _pwd }}/nsconf.yml"
+                  register: st
+
+                - fail:
+                      msg: "ERROR: project config file NOT found at `{{ _pwd }}/nsconf.yml"
+                  when: st.stat.exists == False
+            when: _cmd in ns_commands_requiring_project_cfg
+
+          # load nsconf
+          - include_vars:
+                file: "{{ _pwd }}/nsconf.yml"
+                name: _nsconf
+            when: _cmd in ns_commands_requiring_project_cfg
+        tags: ['prep']
+
+      # include command playbook
+      - include: "{{ _cmd }}.yml"

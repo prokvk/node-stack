@@ -1,0 +1,37 @@
+# generate documentation
+- block:
+    # copy temp files
+    - copy:
+          src: "{{ item.src }}"
+          dest: "{{ item.dest }}"
+      with_items:
+          - {src: "{{ _pwd }}/nsconf.yml", dest: "{{ _pwd }}/app/nsconf.yml"}
+          - {src: "{{ lookup('env','NODESTACK_PATH') }}/templates/doc/doc.css", dest: "{{ _pwd }}/app/doc.css"}
+
+    # genswaggerfile docker cmd
+    - include_role:
+          name: docker
+      vars:
+          _tag: genswaggerfile
+          _user: 1000
+
+    # rm temp conf
+    - file:
+          path: "{{ _pwd }}/app/nsconf.yml"
+          state: absent
+
+    # gendoc docker cmd
+    - include_role:
+          name: docker
+      vars:
+          _tag: gendoc
+          _user: 1000
+
+    # rm temp css file
+    - file:
+          path: "{{ _pwd }}/app/doc.css"
+          state: absent
+
+    # move docfile to doc folder
+    - shell: "mv {{ _pwd }}/app/doc.html {{ _pwd }}/doc/index.html"
+  tags: ['action']

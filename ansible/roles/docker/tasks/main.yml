@@ -1,0 +1,217 @@
+# check required vars
+- block:
+      - fail:
+            msg: "ERROR: required `_container_name` variable is missing"
+        when: _container_name is not defined
+
+      - fail:
+            msg: "ERROR: required `_container_port` variable is missing"
+        when: _container_port is not defined
+
+# set docker network
+- block:
+    - set_fact:
+          _docker_network: "{{ ns_network.name }}"
+      when: _tag == "runs"
+
+    - set_fact:
+          _docker_network: "bridge"
+      when: _tag != "runs"
+
+# load local nsconf
+- include_vars:
+    file: "{{ _pwd }}/{{ _nsconf.local_conf }}"
+    name: _local_nsconf
+
+# set docker args
+- block:
+    - set_fact:
+        _links: ""
+        _hosts: []
+        _volumes: []
+
+    # set links
+    - block:
+          - set_fact:
+              _links: []
+
+          - set_fact:
+              _links: "{{ _links }} + [ '--link={{ item }}' ]"
+            with_items: "{{ _local_nsconf.docker.links }}"
+            when: item != ""
+
+          - set_fact:
+              _links: "{{ _links | join(' ') }}"
+            when: "{{ (_links | length) > 0 }}"
+
+          - set_fact:
+              _links: ""
+            when: "{{ (_links | length) == 0 }}"
+      when:
+          - _set_links is defined
+          - _set_links == True
+
+    # set hosts
+    - block:
+          - set_fact:
+              _hosts: "{{ _hosts }} + [ '--add-host={{ item }}' ]"
+            with_items: "{{ _local_nsconf.docker.hosts }}"
+            when:
+                - _local_nsconf.docker.hosts is defined
+                - _local_nsconf.docker.hosts
+
+          - set_fact:
+              _hosts: "{{ _hosts | join(' ') }}"
+            when: "{{ (_hosts | length) > 0 }}"
+
+          - set_fact:
+              _hosts: ""
+            when: "{{ (_hosts | length) == 0 }}"
+
+    # set volumes
+    - block:
+          - set_fact:
+              _volumes: "{{ _volumes }} + [ '-v {{ item }}' ]"
+            with_items: "{{ _local_nsconf.docker.volumes }}"
+            when:
+                - _local_nsconf.docker.volumes is defined
+                - _local_nsconf.docker.volumes
+
+          - set_fact:
+              _volumes: "{{ _volumes | join(' ') }}"
+            when: "{{ (_volumes | length) > 0 }}"
+
+          - set_fact:
+              _volumes: ""
+            when: "{{ (_volumes | length) == 0 }}"
+
+# npmi task
+- block:
+      - set_fact:
+            _docker_cmd: "npm install --no-bin-links"
+        when: _node_modules is not defined
+
+      - set_fact:
+            _docker_cmd: "npm install --save {{ _node_modules }}"
+        when: _node_modules is defined
+  when:
+      - _tag == "npmi"
+
+# npmi-init-project task
+- block:
+      - set_fact:
+            _components: ""
+
+      - set_fact:
+            components_conf: "{{ components_conf|default({}) | combine( {item: item} ) }}"
+        when:
+            - _nsconf.components[item] is defined
+            - _nsconf.components[item] == 1
+        with_items: "{{ ns_node_modules }}"
+
+      - set_fact:
+            _components: "{{ _components }} knode-{{ components_conf[item] }}"
+        when:
+            - "{{ components_conf is defined }}"
+            - "{{ components_conf[item] is defined }}"
+        with_items: "{{ ns_node_modules }}"
+
+      - set_fact:
+            _docker_cmd: "npm install --save {{ _components }}"
+        when: "{{ _components != '' }}"
+  when:
+      - _tag == "npmi-init-project"
+
+# runs (run server) task
+- block:
+      - set_fact:
+            _docker_cmd: ""
+
+      - set_fact:
+            _info:
+                status: "server starting..."
+                doc_url: "http://localhost:{{ lookup('env','NODESTACK_NGINX_PORT') }}/ns/{{ _project_dir }}/doc"
+                api_url: "http://localhost:{{ lookup('env','NODESTACK_NGINX_PORT') }}/ns/{{ _project_dir }}"
+
+      - debug: msg="{{ _info }}"
+  when:
+      - _tag == "runs"
+
+# genswaggerfile task
+- block:
+      - set_fact:
+            _docker_cmd: "coffee index.coffee mode=genswaggerfile"
+  when:
+      - _tag == "genswaggerfile"
+
+# gendoc (generate documentation) task
+- block:
+      - set_fact:
+            _docker_cmd: "coffee index.coffee mode=gendoc"
+  when:
+      - _tag == "gendoc"
+
+# atest (automated tests) task
+- block:
+      - set_fact:
+            _docker_cmd: "coffee index.coffee mode=tests"
+  when:
+      - _tag == "atest"
+
+# gcompile (grunt compile CS into JS) task
+- block:
+      - set_fact:
+            _docker_cmd: "grunt coffee_compile"
+  when:
+      - _tag == "gcompile"
+
+# set docker cmd fact
+- set_fact:
+      _docker_cmd: "/usr/bin/docker run --rm --name {{ _container_name }} \
+          --user {{ _user }} \
+          --net {{ _docker_network }} \
+          -p {{ _container_port }}:{{ lookup('env','NODESTACK_API_INTERNAL_PORT') }} \
+          {{ _links }} \
+          {{ _hosts }} \
+          {{ _volumes }} \
+          -v {{ _pwd }}/app/:/usr/src/app \
+          -v {{ _pwd }}/supervisor_conf/:/etc/supervisor \
+          {{ _local_nsconf.docker.server_image }} {{ _docker_cmd }}"
+
+# run docker cmd
+- debug: msg="{{ _docker_cmd }}"
+- shell: "eval \"{{ _docker_cmd }}\""
+  register: _out
+  ignore_errors: yes #for atest
+
+# cleanup network in case docker cmd fails
+- block:
+    - shell: "docker network disconnect {{ ns_network.name }} ns_nginx"
+
+    - include_tasks: _docker_network_disconnect.yml
+  when:
+      - _out | failed
+      - _docker_network == "{{ ns_network.name }}"
+
+# atest output
+- block:
+    - shell: "echo \"{{ _out.stdout }}\" > {{ _pwd }}/atest_out"
+      when: _out | success
+
+    - shell: "echo \"{{ _out.stdout }}\" > {{ _pwd }}/atest_err" #we're still using stdout as the content is there even on fail
+      when: _out | failed
+
+    - block:
+        # rm temp conf
+        - file:
+              path: "{{ _pwd }}/app/nsconf.yml"
+              state: absent
+
+        # rm docker network
+        - include_tasks: _docker_network_disconnect.yml
+
+        - fail:
+            msg: "Automated tests failed"
+      when:
+          - _out | failed
+  when: _tag == "atest"

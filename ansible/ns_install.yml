@@ -1,0 +1,84 @@
+- hosts: localhost
+  vars:
+      docker_images:
+          - name: ns_nginx
+            repo: https://github.com/prokvk/ns-docker-nginx.git
+            folder: ns-docker-nginx
+          - name: ns_node_server
+            repo: https://github.com/prokvk/ns-node-server.git
+            folder: ns-node-server
+
+      env_keys:
+          - NODESTACK_PATH
+          - NODESTACK_PROJECTS_PATH
+          - NODESTACK_NGINX_PATH
+          - NODESTACK_NODE_SERVER_CONTAINER
+          - NODESTACK_NGINX_CONTAINER
+          - NODESTACK_DEVELOPER_NAME
+          - NODESTACK_DEVELOPER_EMAIL
+          - NODESTACK_API_INTERNAL_PORT
+          - NODESTACK_NGINX_PORT
+          - NODESTACK_REPO_URL
+  tasks:
+      # build docker images
+      - include_role:
+            name: docker-image
+        vars:
+            _image_name: "{{ item.name }}"
+            _image_repo: "{{ item.repo }}"
+            _image_folder: "{{ _rootdir }}/docker/{{ item.folder }}"
+            _tag: install
+        with_items: "{{ docker_images }}"
+        become: yes
+        become_user: "{{ ns_user }}"
+        tags: ['docker']
+
+      # setup env vars
+      - block:
+            # load vars
+            - include_vars:
+                  file: "{{ _rootdir }}/.install_conf.yml"
+                  name: _envvars
+
+            - replace:
+                path: "{{ _rootdir }}/.env"
+                regexp: "____{{ item }}____"
+                replace: "{{ _envvars[item] }}"
+                backup: no
+              with_items: "{{ env_keys }}"
+        become: yes
+        become_user: "{{ ns_user }}"
+        tags: ['tpl']
+
+      # source NS files
+      - shell: "cat ~/.bashrc | grep ns_bash_completion | wc -l"
+        register: bashrcset
+        become: yes
+        become_user: "{{ ns_user }}"
+        tags: ['source']
+
+      - block:
+            - shell: "printf \"\n\nsource {{ _rootdir }}/.env\" >> ~/.bashrc"
+            - shell: "printf \"\nsource {{ _rootdir }}/ns_bash_completion\" >> ~/.bashrc"
+        when: bashrcset.stdout == "0"
+        become: yes
+        become_user: "{{ ns_user }}"
+        tags: ['source']
+
+      # create bin symlink
+      - block:
+          - shell: "source ~/.bashrc && which nodestack | wc -l"
+            args:
+                executable: /bin/bash
+            register: symlinkexists
+            become: yes
+            become_user: "{{ ns_user }}"
+
+          - file:
+                src: "{{ _rootdir }}/nodestack"
+                dest: /usr/bin/nodestack
+                owner: root
+                group: root
+                state: link
+            when: symlinkexists.stdout == "0"
+        tags: ['symlink']

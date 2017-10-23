@@ -1,0 +1,13 @@
+_items:
+    - orig_name: nginx_project_proxy.conf
+      dest_path: "{{ lookup('env','NODESTACK_NGINX_PATH') }}/config/proxy/{{ _project_dir }}.conf"
+      owner: "{{ ns_user }}"
+      replaces:
+          - {srch: ____PROJECTNAME____, replace: "{{ _project_dir }}"}
+
+    - orig_name: nginx_project_upstream.conf
+      dest_path: "{{ lookup('env','NODESTACK_NGINX_PATH') }}/config/upstream/{{ _project_dir }}.conf"
+      owner: "{{ ns_user }}"
+      replaces:
+          - {srch: ____PROJECTNAME____, replace: "{{ _project_dir }}"}
+          - {srch: ____PROJECTPORT____, replace: "{{ lookup('env','NODESTACK_API_INTERNAL_PORT') }}"}

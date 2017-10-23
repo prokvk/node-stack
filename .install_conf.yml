@@ -1,0 +1,29 @@
+# absolute path to this (nodestack) folder
+NODESTACK_PATH: ____NSPATH____
+
+# absolute path to folder with nodestack projects
+NODESTACK_PROJECTS_PATH: ____YOUR_PROJECTS_PATH_HERE____
+
+# absolute path to nginx (you don't need to edit this)
+NODESTACK_NGINX_PATH: ____NSPATH____/docker/ns-docker-nginx
+
+# node server image name (you don't need to edit this)
+NODESTACK_NODE_SERVER_CONTAINER: ns_node_server
+
+# nginx image name (you don't need to edit this)
+NODESTACK_NGINX_CONTAINER: ns_nginx
+
+# set your name (required for deployment)
+NODESTACK_DEVELOPER_NAME: ____YOUR_NAME_HERE____
+
+# set your email (required for deployment)
+NODESTACK_DEVELOPER_EMAIL: ____YOUR_EMAIL_HERE____
+
+# api port on docker interface (you don't need to edit this)
+NODESTACK_API_INTERNAL_PORT: 8911
+
+# nginx port (you don't need to edit this, unless you do that is)
+NODESTACK_NGINX_PORT: 8080
+
+# node-stack repository URL (you don't need to edit this)
+NODESTACK_REPO_URL: git@github.com:prokvk/node-stack.git

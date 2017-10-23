@@ -1,0 +1,34 @@
+ns_user: prokvk
+
+ns_ansible_path: "{{ lookup('env', 'NODESTACK_PATH') }}/ansible"
+
+ns_storages:
+    - mysql
+    - rabbitmq
+    - redis
+    - mongo
+
+ns_node_modules:
+    - mailer
+    - mongo
+    - mysql
+    - rabbitmq
+    - redis
+    - request
+    - shell
+
+ns_node_server_image: "{{ lookup('env','NODESTACK_NODE_SERVER_CONTAINER') }}"
+
+ns_commands_requiring_project_cfg:
+    - nginx
+    - init_project
+    - runs
+    - gendoc
+    - atest
+    - npmi
+    - gcompile
+
+ns_network:
+    name: nsnet
+    subnet: "172.28.0.0/16"
+    ip_base: 172.28.0

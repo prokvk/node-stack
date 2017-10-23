@@ -1,0 +1,9 @@
+# init project
+- block:
+    # docker cmds
+    - include_role:
+          name: docker
+      vars:
+          _tag: npmi
+          _user: 1000
+  tags: ['action']

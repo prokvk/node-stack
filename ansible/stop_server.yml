@@ -1,0 +1,16 @@
+---
+- hosts: localhost
+  tasks:
+      - block:
+          # load nsconf
+          - include_vars:
+                file: "{{ _pwd }}/nsconf.yml"
+                name: _nsconf
+
+          # stop & rm nginx
+          - shell: "docker stop {{ lookup('env','NODESTACK_NGINX_CONTAINER') }}"
+          - shell: "docker rm {{ lookup('env','NODESTACK_NGINX_CONTAINER') }}"
+
+          #TODO - disconnect connected containers from network
+          - include_tasks: _docker_network_disconnect.yml
+        tags: ['action']

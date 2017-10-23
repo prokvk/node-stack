@@ -1,0 +1,23 @@
+# init project
+- block:
+    # docker cmds
+    - include_role:
+          name: docker
+      vars:
+          _tag: "{{ outer_item }}"
+          _user: 1000
+      with_items:
+          - npmi
+          - npmi-init-project
+      loop_control:
+          loop_var: outer_item
+
+    # rm RMQ consumer files - if disabled in conf
+    - file:
+          path: "{{ item }}"
+          state: absent
+      when: _nsconf.components.rabbitmq_consumer != 1
+      with_items:
+          - "{{ lookup('env','NODESTACK_PROJECTS_PATH') }}/{{ _project_dir }}/app/consumer.coffee"
+          - "{{ lookup('env','NODESTACK_PROJECTS_PATH') }}/{{ _project_dir }}/supervisor_conf/conf.d/consumer.conf"
+  tags: ['action']

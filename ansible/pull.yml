@@ -1,0 +1,38 @@
+# check `_repo` var
+- fail:
+      msg: "ERROR: required `_repo` variable is missing"
+  when: (_repo is undefined) or (_repo == "")
+  tags: ['prep']
+
+# pull project
+- block:
+      # pull repo
+      - git:
+            repo: "{{ _repo }}"
+            dest: "{{ _pwd }}"
+
+      # npm install
+      - shell: "cd {{ _pwd }} && nodestack npmi"
+
+      - file:
+            path: "{{ item }}"
+            state: directory
+        with_items:
+            - "{{ _pwd }}/app/log"
+            - "{{ _pwd }}/doc"
+
+      # copy Gruntfile
+      - copy:
+            src: "{{ lookup('env','NODESTACK_PATH') }}/templates/new-project/app/Gruntfile.coffee"
+            dest: "{{ _pwd }}/app"
+
+      # load nsconf
+      - include_vars:
+            file: "{{ _pwd }}/nsconf.yml"
+            name: _nsconf
+
+      # copy local.nsconf template
+      - copy:
+            src: "{{ lookup('env','NODESTACK_PATH') }}/templates/new-project/local.nsconf.yml"
+            dest: "{{ _pwd }}/{{ _nsconf.local_conf }}"
+  tags: ['action']

@@ -1,0 +1,14 @@
+#disconnect connected containers from network
+- block:
+    - include_vars:
+        file: "{{ _pwd }}/{{ _nsconf.local_conf }}"
+        name: _local_nsconf
+
+    - shell: "docker network disconnect {{ ns_network.name }} {{ item | regex_replace(':.*$', '') }}"
+      when: item != ""
+      with_items: "{{ _local_nsconf.docker.links }}"
+
+    - shell: "sleep 1"
+
+# rm docker network
+- shell: "docker network rm {{ ns_network.name }}"

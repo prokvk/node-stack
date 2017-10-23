@@ -1,0 +1,9 @@
+# grunt compile CS into JS
+- block:
+    # gcompile docker cmd
+    - include_role:
+          name: docker
+      vars:
+          _tag: gcompile
+          _user: 1000
+  tags: ['action']

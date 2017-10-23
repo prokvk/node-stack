@@ -1,0 +1,19 @@
+# check `_project_dir` var
+- fail:
+      msg: "ERROR: required `_project_dir` variable is missing"
+  when: _project_dir is undefined
+  tags: ['prep']
+
+# create project
+- block:
+    - copy:
+        src: "{{ lookup('env','NODESTACK_PATH') }}/templates/new-project/"
+        dest: "{{ lookup('env','NODESTACK_PROJECTS_PATH') }}/{{ _project_dir }}"
+
+    - file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ lookup('env','NODESTACK_PROJECTS_PATH') }}/{{ _project_dir }}/app/log/.gitkeep"
+        - "{{ lookup('env','NODESTACK_PROJECTS_PATH') }}/{{ _project_dir }}/doc/.gitkeep"
+  tags: ['action']

@@ -1,0 +1,12 @@
+# create docker network
+- shell: "docker network create --subnet={{ ns_network.subnet }} {{ ns_network.name }}"
+
+# attach connected containers to network
+- block:
+    - include_vars:
+        file: "{{ _pwd }}/{{ _nsconf.local_conf }}"
+        name: _local_nsconf
+
+    - shell: "docker network connect {{ ns_network.name }} {{ item | regex_replace(':.*$', '') }}"
+      when: item != ""
+      with_items: "{{ _local_nsconf.docker.links }}"

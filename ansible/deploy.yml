@@ -1,0 +1,55 @@
+---
+- hosts: localhost
+  tasks:
+    # Test args
+    - block:
+          - fail:
+              msg: "ERROR: required `_remote` variable is missing"
+            when: (_remote is not defined) or (_remote == "")
+
+          - fail:
+              msg: "ERROR: required `_project_dir` variable is missing"
+            when:
+              - _project_dir is not defined
+      tags: ['prep']
+
+    # Init deploy
+    - name: Init deploy
+      block:
+          # load nsconf
+          - include_vars:
+                file: "{{ _pwd }}/nsconf.yml"
+                name: _nsconf
+
+          # get deploy URL var
+          - shell: "source ~/.bashrc && echo $NODESTACK_DEPLOY_URL"
+            register: _NODESTACK_DEPLOY_URL
+            args:
+                executable: /bin/bash
+            become: yes
+            become_user: "{{ _nsconf.remotes[_remote].user }}"
+            delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+
+          # call deploy API
+          - block:
+              - set_fact:
+                  _body:
+                      project_name: "{{ _nsconf.remotes[_remote].project_name }}"
+                      project_type: ns
+                      task_name: deploy
+                      data:
+                          branch: "{{ _nsconf.remotes[_remote].branch }}"
+                      email: "{{ lookup('env','NODESTACK_DEVELOPER_EMAIL') }}"
+
+              - uri:
+                    url: "{{ _NODESTACK_DEPLOY_URL.stdout }}"
+                    method: POST
+                    body: "{{ _body | to_json }}"
+                    return_content: yes
+                    headers:
+                        Content-Type: "application/json"
+                    body_format: json
+                become: yes
+                become_user: "{{ _nsconf.remotes[_remote].user }}"
+                delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+      tags: ['action']

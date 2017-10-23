@@ -1,0 +1,77 @@
+# setup tpl files
+- block:
+      # load tpl vars
+      - include_vars:
+            file: nginx_templates_conf.yml
+            name: _tpl
+
+      # template role
+      - include_role:
+            name: template
+        vars:
+            _template_src_dir: "{{ ns_ansible_path }}/templates"
+            _template_tmp_dir: "{{ ns_ansible_path }}/templates/tmp"
+            _template_items: "{{ _tpl._items }}"
+  tags: ['tpl']
+
+# stop nginx container (if running)
+- block:
+      - shell: "docker ps -a --format \"{% raw -%}{{.Names}}{%- endraw -%}\" | grep {{ lookup('env','NODESTACK_NGINX_CONTAINER') }} | wc -l"
+        register: nginx_running
+
+      - shell: "docker stop {{ lookup('env','NODESTACK_NGINX_CONTAINER') }}"
+        when: nginx_running.stdout == "1"
+
+      - shell: "docker ps -a --format \"{% raw -%}{{.Names}}{%- endraw -%}\" | grep {{ lookup('env','NODESTACK_NGINX_CONTAINER') }} | wc -l"
+        register: nginx_present
+
+      - shell: "docker rm {{ lookup('env','NODESTACK_NGINX_CONTAINER') }}"
+        when: nginx_present.stdout == "1"
+  tags: ['action']
+
+# create docker network
+- block:
+      # load local nsconf
+      - include_vars:
+          file: "{{ _pwd }}/{{ _nsconf.local_conf }}"
+          name: _local_nsconf
+
+      # set links array
+      - block:
+            - set_fact:
+                _links: []
+
+            - set_fact:
+                _links: "{{ _links }} + [ '--link={{ item }}' ]"
+              with_items: "{{ _local_nsconf.docker.links }}"
+              when: item != ""
+
+      - include_tasks: _docker_network_connect.yml
+  tags: ['action']
+
+#set node server IP
+- block:
+    - set_fact: _lc="{{ _links | count }}"
+    - set_fact: _idx="{{ (_lc | int) + 3 }}" #3 - start from 2, 1 for nginx, 1 for next container
+    - set_fact: _server_ip="{{ ns_network.ip_base }}.{{ _idx }}"
+    - debug: msg="{{ _server_ip }}"
+  tags: ['action']
+
+# start nginx container
+- block:
+      # set docker cmd fact
+      - set_fact:
+            _docker_cmd: "docker run -d --name {{ lookup('env','NODESTACK_NGINX_CONTAINER') }} \
+                -p {{ lookup('env','NODESTACK_NGINX_PORT') }}:{{ lookup('env','NODESTACK_NGINX_PORT') }} \
+                --add-host=\"api.ccl:{{ _server_ip }}\" \
+                --net {{ ns_network.name }} \
+                -v {{ lookup('env','NODESTACK_NGINX_PATH') }}/config:/etc/nginx \
+                -v {{ lookup('env','NODESTACK_NGINX_PATH') }}/keys:/keys \
+                -v {{ lookup('env','NODESTACK_PROJECTS_PATH') }}:/projects \
+                {{ lookup('env','NODESTACK_NGINX_CONTAINER') }}"
+
+
+      # run docker cmd
+      - debug: msg="{{ _docker_cmd }}"
+      - shell: "eval \"{{ _docker_cmd }}\""
+  tags: ['action']

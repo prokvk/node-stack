@@ -1,26 +1,26 @@
 #!/bin/bash
 
-ROOTDIR=$(pwd)
-CFG=$ROOTDIR/.config
-DOCKER_DIR=$ROOTDIR/docker
+SCRIPT=$(readlink -f "$0")
+ROOTDIR=$(dirname $SCRIPT)
 
-. $ROOTDIR/config_functions.sh
+# install ansible - from https://github.com/William-Yeh/docker-ansible/blob/master/ubuntu16.04/Dockerfile
+if [[ $(which ansible | wc -l) -eq 0 ]]; then
+	echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu xenial main" | tee /etc/apt/sources.list.d/ansible.list           && \
+	echo "deb-src http://ppa.launchpad.net/ansible/ansible/ubuntu xenial main" | tee -a /etc/apt/sources.list.d/ansible.list    && \
+	apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 7BB9C367    && \
+	DEBIAN_FRONTEND=noninteractive  apt-get update  && \
+	\
+	\
+	echo "===> Installing Ansible..."  && \
+	apt-get install -y ansible  && \
+	\
+	\
+	echo "===> Adding hosts for convenience..."  && \
+	echo 'localhost ansible_connection=local' > /etc/ansible/hosts
+fi
 
-#pull and install docker images
-DOCKER_IMAGES=(docker_nginx docker_node_server)
+if [[ $(which make | wc -l) -eq 0 ]]; then
+	apt-get install -y make
+fi
 
-for ITEM in ${DOCKER_IMAGES[@]}; do
-	cd $DOCKER_DIR
-	git clone $(parseBlockValue $CFG repo $ITEM)
-
-	IMAGENAME=$(parseBlockValue $CFG image_name $ITEM)
-	if [[ $(docker images | awk '{print $1}' | grep $IMAGENAME | wc -l) -eq 0 ]]; then
-		cd $(parseBlockValue $CFG folder $ITEM)
-		make build
-	fi
-done
-
-#set $NODESTACK_PATH variable
-REPLACEPATH=$(echo $ROOTDIR | sed -e 's/\//\\\//g')
-CMD="sed -i.bak \"s/____NSPATH____/$REPLACEPATH/\" $ROOTDIR/.env" && eval $CMD
-rm $ROOTDIR/.env.bak
+ansible-playbook -i "localhost," --connection="local" $ROOTDIR/ansible/ns_install.yml --extra-vars "_rootdir=$ROOTDIR" -v

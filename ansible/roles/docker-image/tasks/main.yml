@@ -1,0 +1,13 @@
+- block:
+    - shell: "docker images | awk '{print $1}' | grep {{ _image_name }} | wc -l"
+      register: img_installed
+
+    - git:
+        repo: "{{ _image_repo }}"
+        dest: "{{ _image_folder }}"
+      when: img_installed.stdout == "0"
+
+    - shell: "cd {{ _image_folder }} && make build"
+      when: img_installed.stdout == "0"
+  when:
+      - _tag == "install"

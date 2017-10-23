@@ -1,0 +1,28 @@
+# generate documentation
+- block:
+    # copy temp files
+    - copy:
+          src: "{{ item.src }}"
+          dest: "{{ item.dest }}"
+      with_items:
+          - {src: "{{ _pwd }}/nsconf.yml", dest: "{{ _pwd }}/app/nsconf.yml"}
+
+    # setup docker network
+    - include_tasks: _docker_network_connect.yml
+
+    # atest docker cmd
+    - include_role:
+          name: docker
+      vars:
+          _tag: atest
+          _user: 1000
+          _set_links: True
+
+    # rm temp conf
+    - file:
+          path: "{{ _pwd }}/app/nsconf.yml"
+          state: absent
+
+    # rm docker network
+    - include_tasks: _docker_network_disconnect.yml
+  tags: ['action']
