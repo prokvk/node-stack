@@ -322,7 +322,7 @@ case "$1" in
 
 		REPO=$2
 		PWD=$(pwd)
-		PDIR=$(echo $REPO | sed -e 's/^.\+\///' -e 's/\.git$//')
+		PDIR=$(echo $REPO | sed -e 's:.*/::' -e 's/\.git$//')
 
 		git clone $REPO
 		cd $PDIR
