@@ -1,0 +1,36 @@
+# tests
+- block:
+    - fail:
+        msg: "ERROR: required var `_remote_user` missing"
+      when: _remote_user is not defined
+
+    - fail:
+        msg: "ERROR: required var `_remote_host` missing"
+      when: _remote_host is not defined
+
+    - fail:
+        msg: "ERROR: required var `_src` missing"
+      when: _src is not defined
+
+    - fail:
+        msg: "ERROR: required var `_dest` missing"
+      when: _dest is not defined
+
+- set_fact:
+    __exclude: ""
+
+- set_fact:
+    __exclude: "{{ __exclude }} --exclude={{ item }}"
+  when:
+      - _exclude is defined
+      - _exclude
+  with_items: "{{ _exclude }}"
+
+- set_fact:
+    _rsync_cmd: "rsync -avz -e \"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" --progress
+              {{ _src }} {{ _remote_user }}@{{ _remote_host }}:{{ _dest }}
+              {{ __exclude }}"
+
+- debug: msg="{{ _rsync_cmd }}"
+
+- shell: "{{ _rsync_cmd }}" # cant use synchronize from localhost ..

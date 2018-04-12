@@ -11,3 +11,48 @@
       when: img_installed.stdout == "0"
   when:
       - _tag == "install"
+
+- block:
+    - shell: "docker images | awk '{print $1}' | grep {{ _image_name }} | wc -l"
+      become: yes
+      become_user: "{{ _nsconf.remotes[_remote].user }}"
+      delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+      register: img_installed
+
+    - block:
+        - file:
+            path: "{{ _image_dest_folder }}"
+            state: directory
+          become: yes
+          become_user: "{{ _nsconf.remotes[_remote].user }}"
+          delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+
+        - shell: "docker save {{ _image_name }} | gzip > {{ _pwd }}/{{ _image_name }}.tar.gz"
+
+        - copy:
+            src: "{{ _pwd }}/{{ _image_name }}.tar.gz"
+            dest: "{{ _image_dest_folder }}"
+          become: yes
+          become_user: "{{ _nsconf.remotes[_remote].user }}"
+          delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+
+        - shell: "gunzip -c {{ _image_dest_folder }}/{{ _image_name }}.tar.gz | docker load"
+          become: yes
+          become_user: "{{ _nsconf.remotes[_remote].user }}"
+          delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+
+        # rm tar files
+        - block:
+            - file:
+                path: "{{ _pwd }}/{{ _image_name }}.tar.gz"
+                state: absent
+
+            - file:
+                path: "{{ _image_dest_folder }}/{{ _image_name }}.tar.gz"
+                state: absent
+              become: yes
+              become_user: "{{ _nsconf.remotes[_remote].user }}"
+              delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+      when: img_installed.stdout == "0"
+  when:
+      - _tag == "upload"

@@ -26,12 +26,26 @@
           - replaces
 
     # copy tpl files to destinations
-    - copy:
-          src: "{{ _template_tmp_dir }}/{{ item.orig_name }}"
-          dest: "{{ item.dest_path }}"
-          owner: "{{ item.owner }}"
-          group: "{{ item.owner }}"
-      with_items: "{{ _template_items }}"
+    - block:
+        - copy:
+              src: "{{ _template_tmp_dir }}/{{ item.orig_name }}"
+              dest: "{{ item.dest_path }}"
+              owner: "{{ item.owner }}"
+              group: "{{ item.owner }}"
+          with_items: "{{ _template_items }}"
+          when: _explicit_remote is not defined
+
+        - block:
+            - copy:
+                  src: "{{ _template_tmp_dir }}/{{ item.orig_name }}"
+                  dest: "{{ item.dest_path }}"
+                  owner: "{{ item.owner }}"
+                  group: "{{ item.owner }}"
+              with_items: "{{ _template_items }}"
+              become: yes
+              become_user: "{{ item.owner }}"
+              delegate_to: "{{ _explicit_remote }}"
+          when: _explicit_remote is defined
 
     # cleanup
     - name: Remove temp dir

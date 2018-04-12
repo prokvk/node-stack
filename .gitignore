@@ -2,3 +2,4 @@ node_modules
 !docker/.gitkeep
 docker
 !ansible/roles/docker
+.env

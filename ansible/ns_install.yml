@@ -40,6 +40,10 @@
                   file: "{{ _rootdir }}/.install_conf.yml"
                   name: _envvars
 
+            - copy:
+                src: "{{ _rootdir }}/.env.dist"
+                dest: "{{ _rootdir }}/.env"
+
             - replace:
                 path: "{{ _rootdir }}/.env"
                 regexp: "____{{ item }}____"

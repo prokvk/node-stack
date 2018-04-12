@@ -57,7 +57,6 @@ case "$1" in
 		fi
 		;;
 	install-test)	#test that nodestack has been installed correctly
-		#TODO
 		IMAGES=(ns_nginx ns_node_server)
 		DIMAGES=$(docker images | awk '{print $1}')
 		for ITEM in ${IMAGES[@]}; do

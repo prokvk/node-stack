@@ -21,35 +21,244 @@
                 file: "{{ _pwd }}/nsconf.yml"
                 name: _nsconf
 
-          # get deploy URL var
-          - shell: "source ~/.bashrc && echo $NODESTACK_DEPLOY_URL"
-            register: _NODESTACK_DEPLOY_URL
-            args:
-                executable: /bin/bash
+          # test nsconf required vars
+          - block:
+              - fail:
+                  msg: "ERROR: required nsconf remote var `project_name` missing"
+                when: _nsconf.remotes[_remote].project_name is not defined
+
+              - fail:
+                  msg: "ERROR: required nsconf remote var `user` missing"
+                when: _nsconf.remotes[_remote].user is not defined
+
+              - fail:
+                  msg: "ERROR: required nsconf remote var `host` missing"
+                when: _nsconf.remotes[_remote].host is not defined
+
+              - fail:
+                  msg: "ERROR: required nsconf remote var `project.dest_folder` missing"
+                when: _nsconf.remotes[_remote].project.dest_folder is not defined
+
+              - fail:
+                  msg: "ERROR: required nsconf remote var `project.port` missing"
+                when: _nsconf.remotes[_remote].project.port is not defined
+
+              - fail:
+                  msg: "ERROR: required nsconf remote var `docker.server_image` missing"
+                when: _nsconf.remotes[_remote].docker.server_image is not defined
+
+              - fail:
+                  msg: "ERROR: required nsconf remote var `supervisor.cmd` missing"
+                when: _nsconf.remotes[_remote].supervisor.cmd is not defined
+
+              - fail:
+                  msg: "ERROR: required nsconf remote var `supervisor.autostart` missing"
+                when: _nsconf.remotes[_remote].supervisor.autostart is not defined
+
+              - fail:
+                  msg: "ERROR: required nsconf remote var `supervisor.autorestart` missing"
+                when: _nsconf.remotes[_remote].supervisor.autorestart is not defined
+
+              - fail:
+                  msg: "ERROR: required nsconf remote var `supervisor.conf_dir` missing"
+                when: _nsconf.remotes[_remote].supervisor.conf_dir is not defined
+
+              - fail:
+                  msg: "ERROR: required nsconf remote var `supervisor.log_dir` missing"
+                when: _nsconf.remotes[_remote].supervisor.log_dir is not defined
+
+          # stop supervisor task if already running
+          - block:
+              - shell: "{{ _nsconf.remotes[_remote].supervisor.cmd }} status ns_{{ _nsconf.remotes[_remote].project_name }} | grep -i running | wc -l"
+                register: _running
+
+              - shell: "{{ _nsconf.remotes[_remote].supervisor.cmd }} stop ns_{{ _nsconf.remotes[_remote].project_name }}"
+                when: _running.stdout == "1"
             become: yes
             become_user: "{{ _nsconf.remotes[_remote].user }}"
             delegate_to: "{{ _nsconf.remotes[_remote].host }}"
 
-          # call deploy API
+          # re-create project folder on remote
+          - block:
+              - file:
+                  path: "{{ _nsconf.remotes[_remote].project.dest_folder }}"
+                  state: absent
+
+              - file:
+                  path: "{{ _nsconf.remotes[_remote].project.dest_folder }}"
+                  state: directory
+            become: yes
+            become_user: "{{ _nsconf.remotes[_remote].user }}"
+            delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+
+          # remote - upload / clone project repo (optional)
+          - block:
+              - block:
+                  # if upload
+                  - block:
+                      - include_role:
+                          name: rsync
+                        vars:
+                            _src: "{{ _pwd }}/"
+                            _dest: "{{ _nsconf.remotes[_remote].project.dest_folder }}"
+                            _remote_user: "{{ _nsconf.remotes[_remote].user }}"
+                            _remote_host: "{{ _nsconf.remotes[_remote].host }}"
+                            _exclude: "{{ _nsconf.remotes[_remote].project.exclude | default([]) }}"
+                    when: _nsconf.remotes[_remote].project.project_code == 'upload'
+
+                  # if clone
+                  - block:
+                      - git:
+                          repo: "{{ _nsconf.remotes[_remote].project.repository }}"
+                          dest: "{{ _nsconf.remotes[_remote].project.dest_folder }}"
+                          version: "{{ _nsconf.remotes[_remote].project.branch }}"
+                        become: yes
+                        become_user: "{{ _nsconf.remotes[_remote].user }}"
+                        delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+                    when: _nsconf.remotes[_remote].project.project_code == 'clone'
+
+                  # npm install
+                  - block:
+                      - debug: msg="{{ _nsconf.remotes[_remote].npm_cmd }} install"
+
+                      - shell: "{{ _nsconf.remotes[_remote].npm_cmd }} install"
+                        become: yes
+                        become_user: "{{ _nsconf.remotes[_remote].user }}"
+                        delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+
+                  # project supervisor - replace nodemon wi coffee
+                  - block:
+                      - shell: "ls {{ _nsconf.remotes[_remote].project.dest_folder }}/supervisor_conf/conf.d"
+                        register: _out
+
+                      - replace:
+                          path: "{{ _nsconf.remotes[_remote].project.dest_folder }}/supervisor_conf/conf.d/{{ item }}"
+                          regexp: "nodemon"
+                          replace: "coffee"
+                        with_items: "{{ _out.stdout_lines }}"
+                    become: yes
+                    become_user: "{{ _nsconf.remotes[_remote].user }}"
+                    delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+                when:
+                    - _nsconf.remotes[_remote].project.project_code is defined
+                    - _nsconf.remotes[_remote].project.project_code != 'none'
+
+          # setup run.sh
           - block:
               - set_fact:
-                  _body:
-                      project_name: "{{ _nsconf.remotes[_remote].project_name }}"
-                      project_type: ns
-                      task_name: deploy
-                      data:
-                          branch: "{{ _nsconf.remotes[_remote].branch }}"
-                      email: "{{ lookup('env','NODESTACK_DEVELOPER_EMAIL') }}"
+                  _links: ""
+                  _hosts: ""
+                  _volumes: "-v {{ _nsconf.remotes[_remote].project.dest_folder }}/supervisor_conf/:/etc/supervisor"
 
-              - uri:
-                    url: "{{ _NODESTACK_DEPLOY_URL.stdout }}"
-                    method: POST
-                    body: "{{ _body | to_json }}"
-                    return_content: yes
-                    headers:
-                        Content-Type: "application/json"
-                    body_format: json
+              - set_fact:
+                  _links: "{{ _links | default('') }} --link={{ item }}"
+                when: _nsconf.remotes[_remote].docker.links
+                with_items: "{{ _nsconf.remotes[_remote].docker.links }}"
+
+              - set_fact:
+                  _volumes: "{{ _volumes | default('') }} -v {{ item }}"
+                when: _nsconf.remotes[_remote].docker.volumes
+                with_items: "{{ _nsconf.remotes[_remote].docker.volumes }}"
+
+              - set_fact:
+                  _hosts: "{{ _hosts | default('') }} --add-host={{ item }}"
+                when: _nsconf.remotes[_remote].docker.hosts
+                with_items: "{{ _nsconf.remotes[_remote].docker.hosts }}"
+
+              - include_role:
+                  name: template
+                vars:
+                  _template_src_dir: "{{ ns_ansible_path }}/templates"
+                  _template_tmp_dir: "{{ _pwd }}/tmp"
+                  _explicit_remote: "{{ _nsconf.remotes[_remote].host }}"
+                  _template_items:
+                      - orig_name: run.sh
+                        dest_path: "{{ _nsconf.remotes[_remote].project.dest_folder }}/run.sh"
+                        owner: "{{ _nsconf.remotes[_remote].user }}"
+                        replaces:
+                            - {srch: __CONTAINER_NAME__, replace: "{{ _nsconf.remotes[_remote].project_name }}"}
+                            - {srch: __NETWORK__, replace: "{{ _nsconf.remotes[_remote].docker.network | default('bridge') }}"}
+                            - {srch: __API_PORT__, replace: "{{ _nsconf.remotes[_remote].project.port }}"}
+                            - {srch: __IMAGE_NAME__, replace: "{{ _nsconf.remotes[_remote].docker.server_image }}"}
+                            - {srch: __LINKS__, replace: "{{ _links }}"}
+                            - {srch: __HOSTS__, replace: "{{ _hosts }}"}
+                            - {srch: __VOLUMES__, replace: "{{ _volumes }}"}
+
+              - file:
+                  path: "{{ _nsconf.remotes[_remote].project.dest_folder }}/run.sh"
+                  mode: 0775
                 become: yes
                 become_user: "{{ _nsconf.remotes[_remote].user }}"
                 delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+
+          # setup supervisor.conf
+          - block:
+              - include_role:
+                  name: template
+                vars:
+                  _template_src_dir: "{{ ns_ansible_path }}/templates"
+                  _template_tmp_dir: "{{ _pwd }}/tmp"
+                  _explicit_remote: "{{ _nsconf.remotes[_remote].host }}"
+                  _template_items:
+                      - orig_name: remote_supervisor.conf
+                        dest_path: "{{ _nsconf.remotes[_remote].project.dest_folder }}/remote_supervisor.conf"
+                        owner: "{{ _nsconf.remotes[_remote].user }}"
+                        replaces:
+                            - {srch: __PROJECT_NAME__, replace: "ns_{{ _nsconf.remotes[_remote].project_name }}"}
+                            - {srch: __CMD__, replace: "/bin/bash {{ _nsconf.remotes[_remote].project.dest_folder }}/run.sh"}
+                            - {srch: __AUTOSTART__, replace: "{{ _nsconf.remotes[_remote].supervisor.autostart }}"}
+                            - {srch: __AUTORESTART__, replace: "{{ _nsconf.remotes[_remote].supervisor.autorestart }}"}
+                            - {srch: __LOG_DIR__, replace: "{{ _nsconf.remotes[_remote].supervisor.log_dir }}"}
+
+              - shell: "docker run --rm
+                        -v {{ _nsconf.remotes[_remote].project.dest_folder }}:/_src
+                        -v {{ _nsconf.remotes[_remote].supervisor.conf_dir }}:/_dest
+                        ns_node_server
+                        cp /_src/remote_supervisor.conf /_dest/ns_{{ _nsconf.remotes[_remote].project_name }}.conf"
+                become: yes
+                become_user: "{{ _nsconf.remotes[_remote].user }}"
+                delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+
+          # upload docker image (if necessary)
+          - include_role:
+              name: docker-image
+            vars:
+              _image_name: "{{ _nsconf.remotes[_remote].docker.server_image }}"
+              _image_dest_folder: "{{ _nsconf.remotes[_remote].project.dest_folder }}"
+              _tag: upload
+
+          # upload extra folders (optional)
+          - block:
+              - include_role:
+                  name: rsync
+                vars:
+                    _src: "{{ outer_item.src }}"
+                    _dest: "{{ outer_item.dest }}"
+                    _remote_user: "{{ _nsconf.remotes[_remote].user }}"
+                    _remote_host: "{{ _nsconf.remotes[_remote].host }}"
+                    _exclude: "{{ outer_item.exclude | default([]) }}"
+                with_items: "{{ _nsconf.remotes[_remote].extra_uploads }}"
+                loop_control:
+                    loop_var: outer_item
+            when:
+                - _nsconf.remotes[_remote].extra_uploads is defined
+                - _nsconf.remotes[_remote].extra_uploads
+
+          # remote - supervisor update + start
+          - block:
+              - shell: "{{ _nsconf.remotes[_remote].supervisor.cmd }} reread"
+              - shell: "{{ _nsconf.remotes[_remote].supervisor.cmd }} update"
+
+              - shell: "sleep 3"
+                delegate_to: localhost
+
+              - shell: "{{ _nsconf.remotes[_remote].supervisor.cmd }} status ns_{{ _nsconf.remotes[_remote].project_name }} | grep -i running | wc -l"
+                register: _running
+
+              # if project IS NOT running - START
+              - shell: "{{ _nsconf.remotes[_remote].supervisor.cmd }} start ns_{{ _nsconf.remotes[_remote].project_name }}"
+                when: _running.stdout == "0"
+            become: yes
+            become_user: "{{ _nsconf.remotes[_remote].user }}"
+            delegate_to: "{{ _nsconf.remotes[_remote].host }}"
       tags: ['action']

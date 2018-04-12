@@ -9,12 +9,15 @@ This documentation will refer to `coffee` files only. There is a tool prepared f
 
 * GIT
 * Docker
+* ansible
 
 # Installation
 
-Create a directory for node-stack and `cd` into it. Then run
+Create a directory for node-stack and `cd` into it. Then:
 
-`git clone https://bitbucket.org/usertech/node-stack.git . && ./install`
+1. run `git clone https://bitbucket.org/usertech/node-stack.git .`
+2. configure `.install_conf.yml`
+3. run `./install`
 
 This command will install node-stack in current directory.
 
@@ -26,17 +29,10 @@ Install script will pull 2 repositories with docker images and build them. These
 After you've ran installation script you need to do the following:
 
 1. add symlink to `$NODESTACK_PATH/nodestack` to one of `bin` folders in your `$PATH`
-2. setup `$NODESTACK_PATH/.env` file
-3. "source" `$NODESTACK_PATH/.env` in your `.bashrc` / `.bash_profile`
-4. "source" `$NODESTACK_PATH/ns_bash_completion` in your `.bashrc` / `.bash_profile`
+2. "source" `$NODESTACK_PATH/.env` in your `.bashrc` / `.bash_profile`
+3. "source" `$NODESTACK_PATH/ns_bash_completion` in your `.bashrc` / `.bash_profile`
 
-Points 1 and 4 are optional. Obviously without adding symlink you will have to use full path in your commands. Examples in this README will assume that `nodestack` command is available. Also as name suggests, `ns_bash_completion` provides bash completion which won't be available without point 4.
-
-As for `.env` file, you should really only setup these variables:
-
-* `NODESTACK_PROJECTS_PATH`
-* `NODESTACK_DEVELOPER_NAME`
-* `NODESTACK_DEVELOPER_EMAIL`
+Points 1 and 3 are optional. Obviously without adding symlink you will have to use full path in your commands. Examples in this README will assume that `nodestack` command is available. Also as name suggests, `ns_bash_completion` provides bash completion which won't be available without point 3.
 
 # Test your installation
 
@@ -52,12 +48,12 @@ All you should see is `Install test successful`
 
 Every time you run the server (with `nodestack runs`) NGINX config files are generated and NGINX is started/restarted before node server container starts.
 
-`.nodestack` config file is included in every project and holds all configuration for given project (not API itself, which has its own configs).
+`nsconf.yml` and `local.nsconf.yml` config files are included in every project. By default, `nsconf.yml` has its `local_conf` var set to `local.nsconf.yml`. That means it will use this file to run locally. `local.nsconf.yml` is also in `.gitignore`. These config files hold all configuration for given project (not API itself, which has its own configs).
 
 The whole stack is controlled by `nodestack` binary. `ns_bash_completion` provides bash completion for easy use. Available commands are:
 
 * `nodestack create-project` - copy (and setup) files from new project template
-* `nodestack init-project` - install modules based on `.nodestack` config file
+* `nodestack init-project` - install modules based on `nsconf.yml` config file
 * `nodestack runs` - run server
 * `nodestack stops` - stop server
 * `nodestack gendoc` - generate documentation
@@ -69,7 +65,7 @@ The whole stack is controlled by `nodestack` binary. `ns_bash_completion` provid
 * `nodestack deploy` - deploy project to remote
 * `nodestack pull` - pull & setup an existing nodestack project
 
-**IMPORTANT:** All commands need to be run from project root, that is `$NODESTACK_PROJECTS_PATH/project-folder/`, which contains `.nodestack` file created with `nodestack create-project` command. Exceptions are:
+**IMPORTANT:** All commands need to be run from project root, that is `$NODESTACK_PROJECTS_PATH/project-folder/`, which contains `nsconf.yml` and `local.nsconf.yml` files created with `nodestack create-project` command. Exceptions are:
 
 * `nodestack stops` - can be run from anywhere
 * `nodestack install-test` - can be run from anywhere
@@ -78,7 +74,7 @@ The whole stack is controlled by `nodestack` binary. `ns_bash_completion` provid
 
 1. Create new folder for your project inside `$NODESTACK_PROJECTS_PATH` and `cd` into it
 2. run `nodestack create-project`
-3. open and setup `.nodestack` config file (all options are documented in the file)
+3. open and setup `nsconf.yml` and `local.nsconf.yml` config files (all options are documented in these files)
 4. run `nodestack init-project`
 5. in `app/config` folder, setup `config.cson` and `.env` files
 6. in `app/index.coffee` edit the object passed to the init function (this is documented in [knapp](https://www.npmjs.com/package/knapp))
@@ -101,13 +97,14 @@ Recommended project filesystem structure
    |——routes.coffee
 |——doc
 |——.gitignore
-|——.nodestack
+|——local.nsconf.yml
+|——nsconf.yml
 |——supervisor_conf
 ```
 
 `.gitignore` is setup to exclude `app/config/.env` (among other things)
 
-`.nodestack` needs to be in the project root
+`nsconf.yml` and `local.nsconf.yml` config files need to be in the project root
 
 `app` contains the API
 
@@ -125,11 +122,9 @@ DOC: http://localhost:8080/ns/template-project/doc
 API: http://localhost:8080/ns/template-project
 ```
 
-followed by supervisor output.
-
 # Stop API
 
-Good old `CTRL+C` will do :) At the moment this doesn't stop NGINX container though. To stop NGINX use `nodestack stops`
+Good old `CTRL+C` will do :)
 
 # Run automated tests
 
@@ -151,11 +146,28 @@ If you want to install specific module (`npm install --save MODULE_NAME`) then u
 
 To compile coffee files in `app` folder use `nodestack gcompile`
 
-# Deploy to node-stack-server (NSS)
+# Deploy to remote
 
-In order for deploy to remote server, you need to setup a `remote-REMOTENAME` block in projects `.nodestack` file. A sample `dev` block is included in template `.nodestack` file for every project. All the values are described there. You can have as many deploy blocks as you wish.
+## Prerequisites
 
-You also need a SSH access to NSS. You should go through this with NSS maintainer, who will provide you with all information. After you have everything set up, you can deploy to this remote with `nodestack deploy REMOTENAME`. After the deploy is done an email will be sent to the `$NODESTACK_DEVELOPER_EMAIL` with information and links to API and documentation (if documentation is enabled in `.nodestack` file).
+- SSH access to remote
+- gzip (local machine)
+- gunzip (remote)
+- supervisor (remote)
+- docker permissions for your SSH user (remote)
+- supervisor permissions for your SSH user (remote)
+
+`gzip` and `gunzip` are used to pack / unpack docker image which is uploaded to remote during deploy (if necessary).
+
+## Prepare
+
+In order for deploy to remote server, you need to setup a block under `remotes` block in projects `nsconf.yml` file. A sample `dev` block is included in template `nsconf.yml` file for every project. All the values are described there. You can have as many remote blocks as you wish.
+
+You should go through deploy setup with NS maintainer, who will provide you with all information.
+
+## Deploy
+
+After you have everything set up, you can deploy to this remote with `nodestack deploy REMOTENAME`.
 
 # Pull existing nodestack project
 

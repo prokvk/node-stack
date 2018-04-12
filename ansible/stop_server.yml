@@ -11,6 +11,6 @@
           - shell: "docker stop {{ lookup('env','NODESTACK_NGINX_CONTAINER') }}"
           - shell: "docker rm {{ lookup('env','NODESTACK_NGINX_CONTAINER') }}"
 
-          #TODO - disconnect connected containers from network
+          # disconnect connected containers from network
           - include_tasks: _docker_network_disconnect.yml
         tags: ['action']
