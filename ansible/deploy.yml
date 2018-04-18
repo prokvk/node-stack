@@ -149,6 +149,7 @@
                   _links: ""
                   _hosts: ""
                   _volumes: "-v {{ _nsconf.remotes[_remote].project.dest_folder }}/supervisor_conf/:/etc/supervisor"
+                  __env: ""
 
               - set_fact:
                   _links: "{{ _links | default('') }} --link={{ item }}"
@@ -164,6 +165,11 @@
                   _hosts: "{{ _hosts | default('') }} --add-host={{ item }}"
                 when: _nsconf.remotes[_remote].docker.hosts
                 with_items: "{{ _nsconf.remotes[_remote].docker.hosts }}"
+
+              - set_fact:
+                  __env: "{{ __env | default('') }} -e '{{ item }}'"
+                when: _nsconf.remotes[_remote].docker.env
+                with_items: "{{ _nsconf.remotes[_remote].docker.env }}"
 
               - include_role:
                   name: template
@@ -182,7 +188,9 @@
                             - {srch: __IMAGE_NAME__, replace: "{{ _nsconf.remotes[_remote].docker.server_image }}"}
                             - {srch: __LINKS__, replace: "{{ _links }}"}
                             - {srch: __HOSTS__, replace: "{{ _hosts }}"}
+                            - {srch: __ENV__, replace: "{{ __env }}"}
                             - {srch: __VOLUMES__, replace: "{{ _volumes }}"}
+                            - {srch: __CMD__, replace: "{{ _nsconf.remotes[_remote].docker.container_cmd | default('') }}"}
 
               - file:
                   path: "{{ _nsconf.remotes[_remote].project.dest_folder }}/run.sh"

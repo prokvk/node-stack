@@ -1,0 +1,135 @@
+# USAGE
+#
+# create user: ansible-playbook s3_secrets.yml -v --tags "cu" --extra-vars "uname=s3s_test"
+#
+# create user access key: ansible-playbook s3_secrets.yml -v --tags "cuak" --extra-vars "uname=s3s_test"
+#
+# create bucket: ansible-playbook s3_secrets.yml -v --tags "cb" --extra-vars "bname=prokvk-s3s-test region=eu-central-1"
+#
+# user grant bucket access: ansible-playbook s3_secrets.yml -v --tags "ugba" --extra-vars "bname=prokvk-s3s-test uname=s3s_test"
+
+- shell: "whoami"
+  register: _user
+
+- set_fact:
+    _pwd: "{{ playbook_dir }}"
+    _rp: "{{ role_path }}"
+    _user: "{{ _user.stdout }}"
+
+- block:
+    - set_fact:
+        _aws_cmd: "AWS_SHARED_CREDENTIALS_FILE={{ aws_credentials_path }} aws"
+      when:
+          - aws_credentials_path is defined
+          - aws_credentials_path != ""
+
+    - set_fact:
+        _aws_cmd: "aws"
+      when: (aws_credentials_path is not defined) or (aws_credentials_path == "")
+  tags: ['cu','cuak','cb','ugba','full']
+
+- block:
+    - fail:
+        msg: "ERROR: required extra var `uname` not defined"
+      when: (uname is not defined) or (uname == "")
+
+    - shell: "{{ _aws_cmd }} iam create-user --user-name {{ uname }}"
+  when: (_tag == 'cu') or (_tag == 'full') # create user
+
+- block:
+    - fail:
+        msg: "ERROR: required extra var `uname` not defined"
+      when: (uname is not defined) or (uname == "")
+
+    - shell: "{{ _aws_cmd }} iam create-access-key --user-name {{ uname }}"
+      register: _out
+
+    - debug: msg="{{ _out.stdout | from_json }}"
+
+    # template - setup credentials file
+    - block:
+        - set_fact:
+            _out: "{{ _out.stdout | from_json }}"
+
+        - set_fact:
+            credentials_file_dest: "{{ _pwd }}/aws_credentials"
+          when: credentials_file_dest is not defined
+
+        - include_role:
+              name: template
+          vars:
+              _template_src_dir: "{{ _rp }}/templates"
+              _template_tmp_dir: "{{ _rp }}/templates/tmp"
+              _template_items:
+                  - orig_name: "aws_credentials"
+                    dest_path: "{{ credentials_file_dest }}"
+                    owner: "{{ _user }}"
+                    replaces:
+                        - {srch: __ACCESS_KEY_ID__, replace: "{{ _out.AccessKey.AccessKeyId }}"}
+                        - {srch: __SECRET_KEY__, replace: "{{ _out.AccessKey.SecretAccessKey }}"}
+  when: (_tag == 'cuak') or (_tag == 'full') # create user access key
+
+- block:
+    - fail:
+        msg: "ERROR: required extra var `bname` not defined"
+      when: (bname is not defined) or (bname == "")
+
+    - fail:
+        msg: "ERROR: required extra var `region` not defined"
+      when: (region is not defined) or (region == "")
+
+    - shell: "{{ _aws_cmd }} s3 mb s3://{{ bname }} --region {{ region }}"
+      register: _out
+
+    - debug: msg="{{ _out.stdout }}"
+
+    - shell: "{{ _aws_cmd }} s3api put-bucket-acl --bucket {{ bname }} --acl private"
+      register: _out
+
+    - debug: msg="{{ _out.stdout }}"
+
+    - shell: "{{ _aws_cmd }} s3api put-bucket-encryption --bucket {{ bname }} --server-side-encryption-configuration file://{{ _rp }}/templates/bucket_encryption_conf.json"
+      register: _out
+
+    - debug: msg="{{ _out.stdout }}"
+  when: (_tag == 'cb') or (_tag == 'full') # create bucket
+
+- block:
+    - fail:
+        msg: "ERROR: required extra var `uname` not defined"
+      when: (uname is not defined) or (uname == "")
+
+    - fail:
+        msg: "ERROR: required extra var `bname` not defined"
+      when: (bname is not defined) or (bname == "")
+
+    - set_fact:
+        _pname: "AllowS3secrets-{{ bname }}"
+
+    # template - setup iam policy file
+    - include_role:
+          name: template
+      vars:
+          _template_src_dir: "{{ _rp }}/templates"
+          _template_tmp_dir: "{{ _rp }}/templates/tmp"
+          _template_items:
+              - orig_name: "bucket_iam_policy.json"
+                dest_path: "{{ _pwd }}/bucket_iam_policy.json"
+                owner: "{{ _user }}"
+                replaces:
+                    - {srch: __BUCKET__, replace: "{{ bname }}"}
+
+    - shell: "{{ _aws_cmd }} iam create-policy --policy-name {{ _pname }} --policy-document file://{{ _pwd }}/bucket_iam_policy.json"
+      register: _out
+
+    - debug: msg="{{ _out.stdout | from_json }}"
+
+    - file:
+        path: "{{ _pwd }}/bucket_iam_policy.json"
+        state: absent
+
+    - set_fact:
+        _out: "{{ _out.stdout | from_json }}"
+
+    - shell: "{{ _aws_cmd }} iam attach-user-policy --user-name {{ uname }} --policy-arn {{ _out.Policy.Arn }}"
+  when: (_tag == 'ugba') or (_tag == 'full') # user grant bucket access

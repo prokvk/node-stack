@@ -1,0 +1,54 @@
+- block:
+    # create temp dir
+    - file:
+          path: "{{ _template_tmp_dir }}"
+          state: directory
+      delegate_to: 127.0.0.1
+
+    # copy tpl files to temp dir
+    - copy:
+          src: "{{ _template_src_dir }}/{{ item.orig_name }}"
+          dest: "{{ _template_tmp_dir }}/{{ item.orig_name }}"
+      delegate_to: 127.0.0.1
+      with_items:
+          - "{{ _template_items }}"
+
+    # replaces in tpl files
+    - replace:
+          path: "{{ _template_tmp_dir }}/{{ item.0.orig_name }}"
+          regexp: "{{ item.1.srch }}"
+          replace: "{{ item.1.replace }}"
+          backup: no
+      delegate_to: 127.0.0.1
+      when: item.1 is defined
+      with_subelements:
+          - "{{ _template_items }}"
+          - replaces
+
+    # copy tpl files to destinations
+    - block:
+        - copy:
+              src: "{{ _template_tmp_dir }}/{{ item.orig_name }}"
+              dest: "{{ item.dest_path }}"
+              owner: "{{ item.owner }}"
+              group: "{{ item.owner }}"
+          with_items: "{{ _template_items }}"
+          when: _localhost is not defined
+
+        - copy:
+              src: "{{ _template_tmp_dir }}/{{ item.orig_name }}"
+              dest: "{{ item.dest_path }}"
+              owner: "{{ item.owner }}"
+              group: "{{ item.owner }}"
+          delegate_to: 127.0.0.1
+          with_items: "{{ _template_items }}"
+          when:
+              - _localhost is defined
+              - _localhost == 'true'
+
+    # cleanup
+    - name: Remove temp dir
+      file:
+          path: "{{ _template_tmp_dir }}"
+          state: absent
+      delegate_to: 127.0.0.1

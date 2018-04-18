@@ -1,0 +1,37 @@
+---
+- hosts: localhost
+  tasks:
+      - block:
+          - include_role:
+              name: s3-secrets
+            vars:
+              _tag: cu
+        tags: ['cu'] # create user
+
+      - block:
+          - include_role:
+              name: s3-secrets
+            vars:
+              _tag: cuak
+        tags: ['cuak'] # create user access key
+
+      - block:
+          - include_role:
+              name: s3-secrets
+            vars:
+              _tag: cb
+        tags: ['cb'] # create bucket
+
+      - block:
+          - include_role:
+              name: s3-secrets
+            vars:
+              _tag: ugba
+        tags: ['ugba'] # user grant bucket access
+
+      - block:
+          - include_role:
+              name: s3-secrets
+            vars:
+              _tag: full
+        tags: ['full'] # cu, cuak, cb, ugba

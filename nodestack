@@ -89,6 +89,51 @@ case "$1" in
 	pull)	#pull & setup a nodestack project
 		ansible-playbook $NODESTACK_PATH/ansible/ns.yml --connection="local" --extra-vars "_pwd=$PWD _project_dir=$DIR _cmd=pull _repo=$2" --tags "prep,action"
 		;;
+	s3s_cu) # s3 secrets - create user
+		if [[ $aws_credentials_path == '' ]]; then
+			if [[ $2 != '--default-aws-credentials' ]] && [[ $2 != '-dac' ]]; then
+				echo "You didn't specify 'aws_credentials_path'. If you wish to use default path, rerun this command with '--default-aws-credentials' or '-dac'" && exit
+			fi
+		fi
+
+		ansible-playbook $NODESTACK_PATH/ansible/s3s.yml --connection="local" --extra-vars "aws_credentials_path=$aws_credentials_path uname=$uname" --tags "cu"
+		;;
+	s3s_cuak) # s3 secrets - create user access key
+		if [[ $aws_credentials_path == '' ]]; then
+			if [[ $2 != '--default-aws-credentials' ]] && [[ $2 != '-dac' ]]; then
+				echo "You didn't specify 'aws_credentials_path'. If you wish to use default path, rerun this command with '--default-aws-credentials' or '-dac'" && exit
+			fi
+		fi
+
+		ansible-playbook $NODESTACK_PATH/ansible/s3s.yml --connection="local" --extra-vars "aws_credentials_path=$aws_credentials_path uname=$uname" --tags "cuak"
+		;;
+	s3s_cb) # s3 secrets - create S3 bucket
+		if [[ $aws_credentials_path == '' ]]; then
+			if [[ $2 != '--default-aws-credentials' ]] && [[ $2 != '-dac' ]]; then
+				echo "You didn't specify 'aws_credentials_path'. If you wish to use default path, rerun this command with '--default-aws-credentials' or '-dac'" && exit
+			fi
+		fi
+
+		ansible-playbook $NODESTACK_PATH/ansible/s3s.yml --connection="local" --extra-vars "aws_credentials_path=$aws_credentials_path bname=$bname region=$region" --tags "cb"
+		;;
+	s3s_ugba) # s3 secrets - user grant bucket access
+		if [[ $aws_credentials_path == '' ]]; then
+			if [[ $2 != '--default-aws-credentials' ]] && [[ $2 != '-dac' ]]; then
+				echo "You didn't specify 'aws_credentials_path'. If you wish to use default path, rerun this command with '--default-aws-credentials' or '-dac'" && exit
+			fi
+		fi
+
+		ansible-playbook $NODESTACK_PATH/ansible/s3s.yml --connection="local" --extra-vars "aws_credentials_path=$aws_credentials_path uname=$uname bname=$bname" --tags "ugba"
+		;;
+	s3s_full) # s3 secrets - full setup (cu, cuak, cb, ugba)
+		if [[ $aws_credentials_path == '' ]]; then
+			if [[ $2 != '--default-aws-credentials' ]] && [[ $2 != '-dac' ]]; then
+				echo "You didn't specify 'aws_credentials_path'. If you wish to use default path, rerun this command with '--default-aws-credentials' or '-dac'" && exit
+			fi
+		fi
+
+		ansible-playbook $NODESTACK_PATH/ansible/s3s.yml --connection="local" --extra-vars "aws_credentials_path=$aws_credentials_path uname=$uname bname=$bname region=$region" --tags "full"
+		;;
 	*)	#default
 		echo "ERROR: command NOT FOUND!" && exit 1
 		;;

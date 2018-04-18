@@ -35,7 +35,7 @@ ns_parser_options() {
 }
 
 ns_parser_options_default() {
-	ns_parser_options "temp runs stops create-project init-project gendoc atest npmi gcompile install-test deploy printsshkey pull" "temp:cpfuncfiles"
+	ns_parser_options "temp runs stops create-project init-project gendoc atest npmi gcompile install-test deploy printsshkey pull s3s_cu s3s_cuak s3s_cb s3s_ugba s3s_full" "temp:cpfuncfiles"
 }
 
 complete -F ns_parser_options_default nodestack
