@@ -125,6 +125,7 @@
                         become: yes
                         become_user: "{{ _nsconf.remotes[_remote].user }}"
                         delegate_to: "{{ _nsconf.remotes[_remote].host }}"
+                    when: _nsconf.remotes[_remote].npm_cmd is defined
 
                   # project supervisor - replace nodemon wi coffee
                   - block:
@@ -258,7 +259,6 @@
               - shell: "{{ _nsconf.remotes[_remote].supervisor.cmd }} update"
 
               - shell: "sleep 3"
-                delegate_to: localhost
 
               - shell: "{{ _nsconf.remotes[_remote].supervisor.cmd }} status ns_{{ _nsconf.remotes[_remote].project_name }} | grep -i running | wc -l"
                 register: _running

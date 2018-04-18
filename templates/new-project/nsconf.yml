@@ -28,25 +28,47 @@ swagger:
     consumes: "application/json" # you don't need to edit this
     produces: "application/json" # you don't need to edit this
 
-# deploy variables for remote "dev"
 remotes:
+    # deploy variables for remote "dev"
     dev:
-        user: REMOTE_USER_NAME # maintainer of node-stack-server should provide you with this
-        host: REMOTE_URL # maintainer of node-stack-server should provide you with this
-        repository: REPO_URL # GIT repository URL in format "git@bitbucket.org:USERNAME/PROJECT.git" (currently only bitbucket is supported)
-        branch: BRANCH_NAME # specify which branch should be deployed
-        project_name: PROJECT_NAME # project name on node-stack-server on this particular remote
-        tests: 1 # run automated tests on deploy - format is tests=0|1, or you can comment a line out, which has the same effect as setting it to 0
-        doc: 1 # generate documentation on deploy - format is doc=0|1, or you can comment a line out, which has the same effect as setting it to 0
-        nginx_proxy: 1 # setup nginx proxy for documentation and API - format is nginx_proxy=0|1, or you can comment a line out, which has the same effect as setting it to 1
+        user: REMOTE_USER
+        host: REMOTE_HOST
+        project_name: PROJECT_NAME # project name on this particular remote
+        # npm command on remote - sample use with docker
+        # by default, when `project.project_code` is set to upload|clone AND `npm_cmd` is set, deploy will run `NPM_CMD install`. if you don't wish to run `NPM_CMD install`, rm this param
+        npm_cmd: "docker run --rm -v DEST_FOLDER/app:/usr/src/app -w /usr/src/app -u 1000 ns_node_server npm"
+        project:
+            port: 8920 # API port - needs to be the same as API_PORT in project .env file
+            dest_folder: DEST_FOLDER # where files will be saved on remote (repo, run script...)
+            project_code: upload # optional - upload|clone|none (if you have project built in your docker image you can set none, otherwise use `upload` or `clone` + `docker.volumes` to mount your project properly)
+            exclude: # optional, used when "project_code = upload"
+                - app/config/.env
+                - app/node_modules
+            repository: REPO_URL # required when "project_code = clone"
+            branch: master # required when "project_code = clone"
+        extra_uploads: # optional (array of objects defining folders to be uploaded)
+            - src: PATH_TO_SRC_FOLDER
+              dest: DEST_PATH
+            #   exclude: # optional
+            #       - path
         docker:
-            server_image: ns_node_server # maintainer of node-stack-server should provide you with this
+            container_cmd: "/entrypoint.sh" # optional, if not present the default container supervisor command will be used
+            network: bridge # optional, default bridge
+            server_image: nss_ans_aws # maintainer of node-stack-server should provide you with this
+            env: # optional - array
+                - VAR=value
             links: # maintainer of node-stack-server should provide you with this
                 # - mysql:mysql.ccl # this will make MySQL available on URL mysql.ccl inside node server container
-                # - rabbitmq1:rabbitmq.ccl # this will make RabbitMQ available on URL rabbitmq.ccl inside node server container
+                # - ns_server_rmq:rabbitmq.ccl # this will make RabbitMQ available on URL rabbitmq.ccl inside node server container
                 # - redis:redis.ccl # this will make REDIS available on URL redis.ccl inside node server container
                 # - mongo:mongo.ccl # this will make MongoDB available on URL mongo.ccl inside node server container
             hosts:
                 # - mysql.ccl:10.10.8.1 # this will add mysql.ccl into container hosts file making mysql.ccl point to specified IP
             volumes:
                 # - /local/host/path:/container/path # this will share a volume with server container
+        supervisor:
+            cmd: "supervisorctl" # you can change this to `sudo supervisorctl` if you need to run it with sudo
+            conf_dir: /etc/supervisor/conf.d
+            log_dir: LOG_DIR_PATH
+            autostart: true
+            autorestart: true
