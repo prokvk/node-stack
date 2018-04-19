@@ -15,7 +15,7 @@ This documentation will refer to `coffee` files only. There is a tool prepared f
 
 Create a directory for node-stack and `cd` into it. Then:
 
-1. run `git clone https://bitbucket.org/usertech/node-stack.git .`
+1. run `git clone https://github.com/prokvk/node-stack.git .`
 2. configure `.install_conf.yml`
 3. run `./install`
 
