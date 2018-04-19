@@ -64,11 +64,17 @@ The whole stack is controlled by `nodestack` binary. `ns_bash_completion` provid
 * `nodestack printsshkey` - print nodestack public SSH key
 * `nodestack deploy` - deploy project to remote
 * `nodestack pull` - pull & setup an existing nodestack project
+* `nodestack s3s_cu` - s3 secrets - create AWS IAM user
+* `nodestack s3s_cuak` - s3 secrets - create AWS IAM user access keys (AWS security credentials will be saved in `NODESTACK_PATH/ansible` dir)
+* `nodestack s3s_cb` - s3 secrets - create private encrypted S3 bucket
+* `nodestack s3s_ugba` - s3 secrets - grant bucket access to specified user
+* `nodestack s3s_full` - s3 secrets - whole s3 secrets flow (cu, cuak, cb, ugba)
 
 **IMPORTANT:** All commands need to be run from project root, that is `$NODESTACK_PROJECTS_PATH/project-folder/`, which contains `nsconf.yml` and `local.nsconf.yml` files created with `nodestack create-project` command. Exceptions are:
 
 * `nodestack stops` - can be run from anywhere
 * `nodestack install-test` - can be run from anywhere
+* `nodestack s3s_` commands - can be run from anywhere
 
 # Init new project
 
@@ -168,6 +174,32 @@ You should go through deploy setup with NS maintainer, who will provide you with
 ## Deploy
 
 After you have everything set up, you can deploy to this remote with `nodestack deploy REMOTENAME`.
+
+# Use s3 secrets commands
+
+`nodestack s3s_` commands use [ansible role](./ansible/roles/s3-secrets). You can use them to easily manage AWS if you choose to store your secrets in S3.
+
+All s3s commands require that you either specify `aws_credentials_path` with your command or use `--default-aws-credentials|-dac`. Examples:
+
+`aws_credentials_path=/path/to/your/credentials/file uname=YOUR_USER_NAME nodestack s3s_cu`
+
+or
+
+`uname=YOUR_USER_NAME nodestack s3s_cu --default-aws-credentials`
+
+or
+
+`uname=YOUR_USER_NAME nodestack s3s_cu -dac`
+
+Notice `uname` parameter used in those samples. All s3s commands require some parameters, complete list is:
+
+* `s3s_cu` - uname
+* `s3s_cuak` - uname
+* `s3s_cb` - bname, region
+* `s3s_ugba` - uname, bname
+* `s3s_full` - uname, bname, region
+
+If you don't specify these required variables the command will fail with message about missing required variable.
 
 # Pull existing nodestack project
 
